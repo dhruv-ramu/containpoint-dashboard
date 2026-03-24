@@ -2,22 +2,41 @@
  * Chunk markdown files under data/compliance-knowledge/, embed with OpenAI,
  * and upsert rows in ComplianceKnowledgeChunk.
  *
- * Usage: OPENAI_API_KEY=... npm run ingest:knowledge
+ * Usage: npm run ingest:knowledge (loads dashboard/.env)
  */
-import "dotenv/config";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { config as loadEnv } from "dotenv";
 import { embedMany } from "ai";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { withAccelerate } from "@prisma/extension-accelerate";
 import { createOpenAI } from "@ai-sdk/openai";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
+loadEnv({ path: path.join(ROOT, ".env") });
 const KNOWLEDGE_DIR = path.join(ROOT, "data", "compliance-knowledge");
 
 const MAX_CHARS = 2800;
+
+async function withRetry<T>(label: string, fn: () => Promise<T>, retries = 4): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      const wait = 3000 * (i + 1);
+      if (i < retries - 1) {
+        console.warn(`${label} failed (attempt ${i + 1}/${retries}), retrying in ${wait}ms…`);
+        await new Promise((r) => setTimeout(r, wait));
+      }
+    }
+  }
+  throw last;
+}
 
 function chunkMarkdown(source: string, raw: string): { title: string; content: string }[] {
   const lines = raw.split(/\r?\n/);
@@ -77,8 +96,18 @@ async function main() {
   }
 
   const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter });
+  const dbUrl = process.env.DATABASE_URL;
+  const isAccelerate =
+    dbUrl.startsWith("prisma://") || dbUrl.startsWith("prisma+postgres://");
+  const prisma = isAccelerate
+    ? (new PrismaClient({
+        accelerateUrl: dbUrl,
+      }).$extends(withAccelerate()) as unknown as InstanceType<typeof PrismaClient>)
+    : new PrismaClient({
+        adapter: new PrismaPg({ connectionString: dbUrl }),
+      });
+
+  await withRetry("Database connect", () => prisma.$connect());
 
   const files = fs.readdirSync(KNOWLEDGE_DIR).filter((f) => f.endsWith(".md"));
   if (files.length === 0) {
@@ -108,6 +137,8 @@ async function main() {
     });
   }
 
+  await withRetry("Clear existing chunks", () => prisma.complianceKnowledgeChunk.deleteMany({}));
+
   console.log(`Embedding ${rows.length} chunks…`);
   const texts = rows.map((r) => `${r.title}\n\n${r.content}`);
   const { embeddings } = await embedMany({
@@ -115,17 +146,17 @@ async function main() {
     values: texts,
   });
 
-  await prisma.complianceKnowledgeChunk.deleteMany({});
-
-  await prisma.complianceKnowledgeChunk.createMany({
-    data: rows.map((r, i) => ({
-      source: r.source,
-      chunkIndex: r.chunkIndex,
-      title: r.title,
-      content: r.content,
-      embedding: embeddings[i],
-    })),
-  });
+  await withRetry("Insert chunks", () =>
+    prisma.complianceKnowledgeChunk.createMany({
+      data: rows.map((r, i) => ({
+        source: r.source,
+        chunkIndex: r.chunkIndex,
+        title: r.title,
+        content: r.content,
+        embedding: embeddings[i],
+      })),
+    })
+  );
 
   console.log(`Inserted ${rows.length} chunks.`);
   await prisma.$disconnect();
