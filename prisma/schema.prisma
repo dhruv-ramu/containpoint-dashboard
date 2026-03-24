@@ -1164,3 +1164,18 @@ model ExportArtifact {
 
   @@index([exportJobId])
 }
+
+// ============ AI / RAG (compliance knowledge) ============
+
+model ComplianceKnowledgeChunk {
+  id         String   @id @default(cuid())
+  source     String
+  chunkIndex Int
+  title      String
+  content    String   @db.Text
+  embedding  Json
+  createdAt  DateTime @default(now())
+
+  @@unique([source, chunkIndex])
+  @@index([source])
+}
