@@ -74,6 +74,9 @@ enum FileObjectType {
   FACILITY
   ASSET
   CONTAINMENT_UNIT
+  INSPECTION_RUN
+  CORRECTIVE_ACTION
+  TRAINING_EVENT
 }
 
 enum AssetStatus {
@@ -87,6 +90,73 @@ enum ConditionStatus {
   FAIR
   POOR
   REQUIRES_ATTENTION
+}
+
+// Phase 2 enums
+enum RequirementSourceType {
+  REGULATION
+  GUIDANCE
+  INTERPRETATION
+  ENFORCEMENT_EXAMPLE
+}
+
+enum InspectionType {
+  VISUAL
+  FORMAL_VISUAL
+  INTEGRITY_TEST
+  LEAK_TEST
+  DRAINAGE_RELEASE_CHECK
+  OVERFILL_DEVICE_TEST
+  PREVENTIVE_MAINTENANCE
+}
+
+enum AssetClass {
+  BULK_STORAGE_CONTAINER
+  CONTAINMENT_UNIT
+  TRANSFER_AREA
+  PIPING
+  MOBILE_PORTABLE_CONTAINER
+  FACILITY_AREA
+}
+
+enum AssetModeState {
+  STATIONARY_UNATTENDED
+  ACTIVE_TRANSFER_UNDER_CONTROL
+}
+
+enum CorrectiveActionSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum CorrectiveActionStatus {
+  OPEN
+  IN_PROGRESS
+  PENDING_VERIFICATION
+  CLOSED
+  ACCEPTED_RISK
+}
+
+enum ObligationType {
+  INSPECTION_DUE
+  INSPECTION_OVERDUE
+  ACTION_OVERDUE
+  TRAINING_DUE
+  REVIEW_DUE
+  SIGNATURE_MISSING
+}
+
+enum ValidationSeverity {
+  HARD_FAILURE
+  AT_RISK
+}
+
+enum TrainingEventType {
+  ONBOARDING
+  ANNUAL_BRIEFING
+  REMEDIAL
 }
 
 // ============ CORE AUTH / ORG ============
@@ -107,6 +177,13 @@ model User {
   assessedQualification   FacilityQualificationRecord[]     @relation("AssessedByUser")
   uploadedFiles          FileAsset[]
   auditEvents            AuditEvent[]                      @relation("ActorUser")
+
+  // Phase 2
+  inspectionRuns              InspectionRun[]         @relation("PerformedByUser")
+  correctiveActionsOwned      CorrectiveAction[]      @relation("ActionOwner")
+  correctiveActionsVerified   CorrectiveAction[]      @relation("ActionVerifiedBy")
+  trainingAttendance          TrainingAttendance[]
+  trainingSignatures          TrainingSignature[]
 }
 
 model Organization {
@@ -119,6 +196,8 @@ model Organization {
   memberships  OrganizationMembership[]
   facilities   Facility[]
   auditEvents  AuditEvent[]
+  regulatoryRequirements RegulatoryRequirement[]
+  inspectionTemplates  InspectionTemplate[]
 }
 
 model OrganizationMembership {
@@ -156,6 +235,16 @@ model Facility {
   transferAreas    TransferArea[]
   files            FileAsset[]
   auditEvents      AuditEvent[]
+
+  // Phase 2
+  inspectionTemplates  InspectionTemplate[]
+  scheduledInspections ScheduledInspection[]
+  inspectionRuns       InspectionRun[]
+  correctiveActions   CorrectiveAction[]
+  personnel           Personnel[]
+  trainingEvents      TrainingEvent[]
+  obligationRecords   ObligationRecord[]
+  validationResults   ValidationResult[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -303,6 +392,16 @@ model Asset {
   oilType       OilType?               @relation(fields: [oilTypeId], references: [id], onDelete: SetNull)
   containmentLinks AssetContainmentLink[]
 
+  // Phase 2 extensions
+  assetClass                AssetClass?
+  modeState                 AssetModeState?
+  requiresSizedContainment  Boolean      @default(false)
+  underDirectControl        Boolean?
+  containmentValidationBasis String?     @db.Text
+
+  correctiveActions        CorrectiveAction[]
+  scheduledInspections     ScheduledInspection[]
+
   @@unique([facilityId, assetCode])
   @@index([facilityId])
   @@index([oilTypeId])
@@ -402,4 +501,362 @@ model AuditEvent {
   @@index([facilityId])
   @@index([actorUserId])
   @@index([createdAt])
+}
+
+// ============ PHASE 2: REGULATORY LAYER ============
+
+model RegulatoryRequirement {
+  id                    String              @id @default(cuid())
+  organizationId        String
+  requirementCode       String
+  title                 String
+  sourceType            RequirementSourceType
+  citationRef           String?             @db.Text
+  controllingSection    String?
+  summary               String?             @db.Text
+  evidenceRequirementsJson Json?
+  severityModel         String?
+  active                Boolean             @default(true)
+  createdAt             DateTime            @default(now())
+
+  organization         Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  templateItems        InspectionTemplateItem[]
+  correctiveActions    CorrectiveAction[]
+
+  @@unique([organizationId, requirementCode])
+  @@index([organizationId])
+}
+
+// ============ PHASE 2: INSPECTION SYSTEM ============
+
+model InspectionTemplate {
+  id              String   @id @default(cuid())
+  organizationId  String
+  facilityId      String?  // null = org-wide template
+  name            String
+  assetClass      AssetClass
+  inspectionType  InspectionType
+  standardBasisRef String? @db.Text
+  procedureText   String?  @db.Text
+  expectedFrequencyDays Int?
+  performerQualificationBasis String? @db.Text
+  requiredEvidenceTypes  String? @db.Text  // JSON array of types
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  facility     Facility?    @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  versions  InspectionTemplateVersion[]
+  scheduledInspections ScheduledInspection[]
+
+  @@index([organizationId])
+  @@index([facilityId])
+}
+
+model InspectionTemplateVersion {
+  id          String   @id @default(cuid())
+  templateId  String
+  version     Int
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  template InspectionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  items    InspectionTemplateItem[]
+
+  @@unique([templateId, version])
+  @@index([templateId])
+}
+
+model InspectionTemplateItem {
+  id                      String   @id @default(cuid())
+  templateVersionId       String
+  sequenceOrder           Int
+  prompt                  String   @db.Text
+  responseType            String   // boolean, number, text, single_select, multi_select, photo_required, signature_required
+  required                Boolean  @default(false)
+  acceptableRange         String?  @db.Text  // JSON for range
+  failureSeverity         CorrectiveActionSeverity?
+  regulatoryRequirementId String?
+  autoCreateCorrectiveAction Boolean @default(false)
+  createdAt               DateTime @default(now())
+
+  templateVersion     InspectionTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Cascade)
+  regulatoryRequirement RegulatoryRequirement?  @relation(fields: [regulatoryRequirementId], references: [id], onDelete: SetNull)
+  itemResults         InspectionItemResult[]
+  correctiveActions   CorrectiveAction[]
+
+  @@index([templateVersionId])
+}
+
+model ScheduledInspection {
+  id              String   @id @default(cuid())
+  facilityId      String
+  templateId      String
+  assetId         String?
+  dueDate         DateTime
+  recurrenceRule  String?  @db.Text
+  assignedUserId  String?
+  status          String   // scheduled, in_progress, completed, missed, canceled
+  priority        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  facility  Facility  @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  template  InspectionTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  asset     Asset?    @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  runs      InspectionRun[]
+
+  @@index([facilityId])
+  @@index([dueDate])
+  @@index([status])
+}
+
+model InspectionRun {
+  id                    String   @id @default(cuid())
+  scheduledInspectionId String
+  facilityId            String
+  performedByUserId     String
+  performedByNameSnapshot String
+  performedByRoleSnapshot String
+  qualificationBasis    String?  @db.Text
+  performedAt           DateTime
+  performedAtTimezone   String?
+  standardBasisRef      String?  @db.Text
+  procedureTextSnapshot String?  @db.Text
+  status                String   // in_progress, completed
+  locked                Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  scheduledInspection ScheduledInspection @relation(fields: [scheduledInspectionId], references: [id], onDelete: Cascade)
+  facility            Facility            @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  performedBy         User                @relation("PerformedByUser", fields: [performedByUserId], references: [id], onDelete: Restrict)
+  itemResults         InspectionItemResult[]
+  signatures          InspectionSignature[]
+  correctiveActions   CorrectiveAction[]
+
+  @@index([facilityId])
+  @@index([performedByUserId])
+  @@index([performedAt])
+}
+
+model InspectionItemResult {
+  id              String   @id @default(cuid())
+  inspectionRunId String
+  templateItemId  String
+  responseValue   Json?    // stores the actual response
+  pass            Boolean?
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+
+  inspectionRun InspectionRun       @relation(fields: [inspectionRunId], references: [id], onDelete: Cascade)
+  templateItem  InspectionTemplateItem @relation(fields: [templateItemId], references: [id], onDelete: Restrict)
+
+  @@unique([inspectionRunId, templateItemId])
+  @@index([inspectionRunId])
+}
+
+model InspectionSignature {
+  id              String   @id @default(cuid())
+  inspectionRunId String
+  signerUserId    String?
+  signerName      String
+  signerRole      String?
+  signedAt        DateTime
+  signatureData   String?  @db.Text  // base64 or ref to stored signature
+  createdAt       DateTime @default(now())
+
+  inspectionRun InspectionRun @relation(fields: [inspectionRunId], references: [id], onDelete: Cascade)
+
+  @@index([inspectionRunId])
+}
+
+// ============ PHASE 2: CORRECTIVE ACTIONS ============
+
+model CorrectiveAction {
+  id                    String                 @id @default(cuid())
+  facilityId            String
+  assetId               String?
+  regulatoryRequirementId String?
+  sourceInspectionItemId String?
+  sourceInspectionRunId  String?
+  title                 String
+  description           String?                @db.Text
+  severity              CorrectiveActionSeverity
+  triggerCategory       String?                // inspection_failure, audit, etc.
+  ownerUserId           String
+  dueDate               DateTime?
+  status                CorrectiveActionStatus @default(OPEN)
+  rootCause             String?                @db.Text
+  closureNote           String?                @db.Text
+  acceptedRiskJustification String?            @db.Text  // required when status=ACCEPTED_RISK
+  verifiedByUserId      String?
+  verifiedAt            DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  facility              Facility     @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  asset                 Asset?       @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  regulatoryRequirement RegulatoryRequirement? @relation(fields: [regulatoryRequirementId], references: [id], onDelete: SetNull)
+  sourceInspectionItem  InspectionTemplateItem? @relation(fields: [sourceInspectionItemId], references: [id], onDelete: SetNull)
+  sourceInspectionRun   InspectionRun? @relation(fields: [sourceInspectionRunId], references: [id], onDelete: SetNull)
+  owner                 User         @relation("ActionOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  verifiedBy            User?        @relation("ActionVerifiedBy", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
+  comments              CorrectiveActionComment[]
+  evidence              CorrectiveActionEvidence[]
+  statusHistory         CorrectiveActionStatusHistory[]
+
+  @@index([facilityId])
+  @@index([assetId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([ownerUserId])
+}
+
+model CorrectiveActionComment {
+  id        String   @id @default(cuid())
+  actionId  String
+  userId    String?
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  action CorrectiveAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@index([actionId])
+}
+
+model CorrectiveActionEvidence {
+  id        String   @id @default(cuid())
+  actionId  String
+  fileId    String?  // references FileAsset or similar
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+
+  action CorrectiveAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@index([actionId])
+}
+
+model CorrectiveActionStatusHistory {
+  id        String                 @id @default(cuid())
+  actionId  String
+  fromStatus CorrectiveActionStatus?
+  toStatus   CorrectiveActionStatus
+  changedAt DateTime               @default(now())
+  changedByUserId String?
+
+  action CorrectiveAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@index([actionId])
+}
+
+// ============ PHASE 2: TRAINING ============
+
+model Personnel {
+  id                    String   @id @default(cuid())
+  facilityId            String
+  name                  String
+  email                 String?
+  phone                 String?
+  roleTitle             String?
+  oilHandlingPersonnel  Boolean  @default(false)
+  active                Boolean  @default(true)
+  hireDate              DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  attendance TrainingAttendance[]
+
+  @@index([facilityId])
+}
+
+model TrainingEvent {
+  id              String           @id @default(cuid())
+  facilityId      String
+  type            TrainingEventType
+  eventDate       DateTime
+  instructorName  String?
+  agenda          String?          @db.Text
+  linkedIncidentIds String?        @db.Text  // JSON array of incident refs
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  attendance TrainingAttendance[]
+  signatures TrainingSignature[]
+
+  @@index([facilityId])
+  @@index([eventDate])
+}
+
+model TrainingAttendance {
+  id           String   @id @default(cuid())
+  eventId      String
+  personnelId  String
+  userId       String?  // optional link to User if attendee is a system user
+  attended     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  event     TrainingEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  personnel Personnel     @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+  user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, personnelId])
+  @@index([eventId])
+}
+
+model TrainingSignature {
+  id          String   @id @default(cuid())
+  eventId     String
+  userId      String
+  signedAt    DateTime
+  signatureData String? @db.Text
+  createdAt   DateTime @default(now())
+
+  event TrainingEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+}
+
+// ============ PHASE 2: OBLIGATIONS + VALIDATION ============
+
+model ObligationRecord {
+  id                String        @id @default(cuid())
+  facilityId        String
+  requirementCode   String
+  obligationType    ObligationType
+  sourceObjectType  String
+  sourceObjectId    String?
+  severity          ValidationSeverity
+  status            String        // open, satisfied
+  dueDate           DateTime?
+  satisfiedAt       DateTime?
+  evidenceObjectType String?
+  evidenceObjectId  String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@index([facilityId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([obligationType])
+}
+
+model ValidationResult {
+  id           String   @id @default(cuid())
+  facilityId   String
+  computedAt   DateTime @default(now())
+  hardFailures Json     // JSON array of failure objects
+  riskFlags    Json     // JSON array of risk flag objects
+  overallStatus String  // COMPLIANT, AT_RISK, NONCOMPLIANT
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@index([facilityId])
 }

@@ -11,6 +11,10 @@ import {
   Box,
   Container,
   FileText,
+  ClipboardCheck,
+  AlertTriangle,
+  GraduationCap,
+  CalendarCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +31,10 @@ const facilityNavItems = [
   { href: "applicability", label: "Applicability", icon: ClipboardList },
   { href: "assets", label: "Assets", icon: Box },
   { href: "containment", label: "Containment", icon: Container },
+  { href: "inspections", label: "Inspections", icon: ClipboardCheck },
+  { href: "corrective-actions", label: "Corrective Actions", icon: AlertTriangle },
+  { href: "training", label: "Training", icon: GraduationCap },
+  { href: "obligations", label: "Obligations", icon: CalendarCheck },
 ];
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {

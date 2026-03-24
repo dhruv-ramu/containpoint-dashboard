@@ -10,7 +10,18 @@ type AuditAction =
   | "containment.created"
   | "containment.updated"
   | "file.uploaded"
-  | "profile.updated";
+  | "profile.updated"
+  // Phase 2
+  | "inspection_template.created"
+  | "inspection_template.updated"
+  | "inspection.completed"
+  | "inspection.signed"
+  | "corrective_action.created"
+  | "corrective_action.updated"
+  | "training_event.created"
+  | "obligation.created"
+  | "obligation.resolved"
+  | "validation.result_changed";
 
 type AuditParams = {
   organizationId?: string;
