@@ -1,10 +1,15 @@
 import { mkdir, writeFile, readFile, unlink } from "fs/promises";
 import path from "path";
+import os from "os";
 import { randomUUID } from "crypto";
 import { supabase, useSupabaseStorage } from "./supabase-server";
 
 const BUCKET = "uploads";
-const UPLOAD_DIR = process.env.UPLOAD_DIR ?? path.join(process.cwd(), "uploads");
+// In serverless (Vercel/Lambda), process.cwd() is read-only. Use /tmp which is writable.
+const isServerless = !!process.env.VERCEL || process.cwd().startsWith("/var/task");
+const UPLOAD_DIR =
+  process.env.UPLOAD_DIR ??
+  (isServerless ? path.join(os.tmpdir(), "containpoint-uploads") : path.join(process.cwd(), "uploads"));
 
 function contentTypeFromExt(ext: string): string {
   const map: Record<string, string> = {
