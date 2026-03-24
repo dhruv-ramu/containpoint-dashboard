@@ -1,0 +1,405 @@
+// ContainPoint - SPCC Compliance SaaS
+// Phase 1 Schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============ ENUMS ============
+
+enum UserRole {
+  ORG_ADMIN
+  FACILITY_MANAGER
+  INSPECTOR
+  REVIEWER
+  READ_ONLY_AUDITOR
+}
+
+enum FacilityStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ApplicabilityStatus {
+  NOT_ASSESSED
+  APPLICABLE
+  NOT_APPLICABLE
+}
+
+enum QualificationTier {
+  NOT_QUALIFIED
+  TIER_I
+  TIER_II
+  PE_CERTIFIED_ONLY
+}
+
+enum AssetType {
+  BULK_STORAGE_CONTAINER
+  DRUM_TOTE
+  TRANSFORMER
+  MOBILE_CONTAINER
+  LOADING_UNLOADING_AREA
+  TRANSFER_AREA
+  OTHER
+}
+
+enum OilTypeCategory {
+  DIESEL
+  GASOLINE
+  HYDRAULIC
+  LUBE
+  USED_OIL
+  TRANSFORMER
+  CRUDE
+  OTHER
+}
+
+enum ContainmentType {
+  DIKE_BERM
+  PALLET
+  BUILDING_FLOOR
+  SUMP
+  DOUBLE_WALL
+  OTHER
+}
+
+enum FileObjectType {
+  FACILITY
+  ASSET
+  CONTAINMENT_UNIT
+}
+
+enum AssetStatus {
+  ACTIVE
+  INACTIVE
+  RETIRED
+}
+
+enum ConditionStatus {
+  GOOD
+  FAIR
+  POOR
+  REQUIRES_ATTENTION
+}
+
+// ============ CORE AUTH / ORG ============
+
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  emailVerified  DateTime?
+  passwordHash   String?
+  image          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organizationMemberships OrganizationMembership[]
+  facilityMemberships     FacilityMembership[]
+  assessedApplicability   FacilityApplicabilityAssessment[] @relation("AssessedByUser")
+  assessedQualification   FacilityQualificationRecord[]     @relation("AssessedByUser")
+  uploadedFiles          FileAsset[]
+  auditEvents            AuditEvent[]                      @relation("ActorUser")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships  OrganizationMembership[]
+  facilities   Facility[]
+  auditEvents  AuditEvent[]
+}
+
+model OrganizationMembership {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  role           UserRole
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model Facility {
+  id             String         @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  status         FacilityStatus @default(DRAFT)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization     Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships      FacilityMembership[]
+  profile          FacilityProfile?
+  applicability    FacilityApplicabilityAssessment[]
+  qualification    FacilityQualificationRecord[]
+  accountablePerson FacilityAccountablePerson?
+  assets           Asset[]
+  containmentUnits ContainmentUnit[]
+  transferAreas    TransferArea[]
+  files            FileAsset[]
+  auditEvents      AuditEvent[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model FacilityMembership {
+  id         String   @id @default(cuid())
+  facilityId String
+  userId     String
+  role       UserRole
+  createdAt  DateTime @default(now())
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([facilityId, userId])
+  @@index([facilityId])
+  @@index([userId])
+}
+
+// ============ FACILITY MASTER DATA ============
+
+model FacilityProfile {
+  id                          String    @id @default(cuid())
+  facilityId                  String    @unique
+  legalName                   String?
+  dbaName                     String?
+  addressLine1                String?
+  addressLine2                String?
+  city                        String?
+  state                       String?
+  postalCode                  String?
+  country                     String?   @default("US")
+  latitude                    Float?
+  longitude                   Float?
+  naicsCode                   String?
+  industry                    String?
+  dischargeExpectationNarrative String?  @db.Text
+  nearestWaterbody            String?
+  operatingHours              String?
+  consultantOfRecord          String?
+  emergencyContactName        String?
+  emergencyContactPhone       String?
+  currentPlanEffectiveDate    DateTime?
+  nextFiveYearReviewDate      DateTime?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+}
+
+model FacilityApplicabilityAssessment {
+  id                               String             @id @default(cuid())
+  facilityId                       String
+  nonTransportationRelated         Boolean
+  aggregateAbovegroundCapacityGallons Int
+  completelyBuriedCapacityGallons  Int
+  hasReasonableExpectationOfDischarge Boolean
+  hasContainersBelow55Excluded     Boolean
+  hasPermanentlyClosedContainersExcluded Boolean
+  hasMotivePowerContainersExcluded Boolean
+  hasWastewaterTreatmentExclusions Boolean
+  spccApplicable                   Boolean
+  notes                            String?            @db.Text
+  assessedAt                       DateTime
+  assessedByUserId                 String
+
+  facility      Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  assessedBy    User     @relation("AssessedByUser", fields: [assessedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([facilityId])
+}
+
+model FacilityQualificationRecord {
+  id                              String            @id @default(cuid())
+  facilityId                      String
+  qualifiedFacility               Boolean
+  tier                            QualificationTier
+  maxIndividualContainerGallons   Int?
+  singleDischargeGt1000Last3Years Boolean
+  twoDischargesGt42Within12MonthsLast3Years Boolean
+  qualificationRationale         String?           @db.Text
+  v1Fit                          String?           // ideal | acceptable | out_of_scope
+  assessedAt                     DateTime
+  assessedByUserId               String
+
+  facility    Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  assessedBy  User     @relation("AssessedByUser", fields: [assessedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([facilityId])
+}
+
+model FacilityAccountablePerson {
+  id         String   @id @default(cuid())
+  facilityId String   @unique
+  name       String
+  title      String?
+  email      String
+  phone      String?
+  appointedAt DateTime @default(now())
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+}
+
+// ============ ASSETS AND CONTAINMENT ============
+
+model OilType {
+  id       String          @id @default(cuid())
+  label    String
+  category OilTypeCategory
+  active   Boolean         @default(true)
+
+  assets Asset[]
+}
+
+model Asset {
+  id                      String       @id @default(cuid())
+  facilityId              String
+  assetCode               String
+  name                    String
+  assetType               AssetType
+  oilTypeId               String?
+  storageCapacityGallons  Int?
+  typicalFillPercent      Int?
+  countedTowardThreshold  Boolean      @default(true)
+  exclusionReason         String?      @db.Text
+  aboveground             Boolean      @default(true)
+  indoor                  Boolean?
+  status                  AssetStatus  @default(ACTIVE)
+  installDate             DateTime?
+  retirementDate          DateTime?
+  manufacturer            String?
+  material                String?
+  dimensions              String?      @db.Text
+  overfillProtectionNotes String?      @db.Text
+  integrityTestingBasis   String?      @db.Text
+  inspectionFrequencyDays Int?
+  lastInspectionDate      DateTime?
+  nextInspectionDate      DateTime?
+  comments                String?      @db.Text
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+
+  facility      Facility               @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  oilType       OilType?               @relation(fields: [oilTypeId], references: [id], onDelete: SetNull)
+  containmentLinks AssetContainmentLink[]
+
+  @@unique([facilityId, assetCode])
+  @@index([facilityId])
+  @@index([oilTypeId])
+}
+
+model ContainmentUnit {
+  id                           String          @id @default(cuid())
+  facilityId                   String
+  code                         String
+  name                         String
+  containmentType              ContainmentType
+  largestSingleTankCapacityGallons Int?
+  capacityCalculationMethod    String?         @db.Text
+  calculatedCapacityGallons    Int?
+  drainageControlNotes         String?         @db.Text
+  conditionStatus              ConditionStatus?
+  lastInspectionDate           DateTime?
+  comments                     String?         @db.Text
+  createdAt                    DateTime        @default(now())
+  updatedAt                    DateTime        @updatedAt
+
+  facility      Facility              @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  assetLinks    AssetContainmentLink[]
+
+  @@unique([facilityId, code])
+  @@index([facilityId])
+}
+
+model AssetContainmentLink {
+  id                String @id @default(cuid())
+  assetId           String
+  containmentUnitId String
+
+  asset          Asset          @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  containmentUnit ContainmentUnit @relation(fields: [containmentUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, containmentUnitId])
+  @@index([containmentUnitId])
+}
+
+model TransferArea {
+  id             String   @id @default(cuid())
+  facilityId     String
+  name           String
+  description    String?  @db.Text
+  drainageControls String? @db.Text
+  comments       String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@index([facilityId])
+}
+
+// ============ FILES ============
+
+model FileAsset {
+  id             String        @id @default(cuid())
+  facilityId     String
+  objectType     FileObjectType
+  objectId       String
+  fileName       String
+  mimeType       String
+  storageKey     String
+  checksum       String?
+  uploadedByUserId String
+  uploadedAt     DateTime      @default(now())
+  caption        String?
+
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  uploadedBy User     @relation(fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([facilityId])
+  @@index([objectType, objectId])
+}
+
+// ============ AUDIT ============
+
+model AuditEvent {
+  id             String   @id @default(cuid())
+  organizationId String?
+  facilityId     String?
+  actorUserId    String?
+  objectType     String
+  objectId       String?
+  action         String
+  beforeJson     Json?
+  afterJson      Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  facility     Facility?     @relation(fields: [facilityId], references: [id], onDelete: SetNull)
+  actor        User?        @relation("ActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([facilityId])
+  @@index([actorUserId])
+  @@index([createdAt])
+}
