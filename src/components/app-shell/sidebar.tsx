@@ -7,17 +7,38 @@ import {
   Building2,
   Settings,
   ChevronLeft,
+  ClipboardList,
+  Box,
+  Container,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const navItems = [
+const globalNavItems = [
   { href: "/app", label: "Dashboard", icon: LayoutDashboard },
   { href: "/app/facilities", label: "Facilities", icon: Building2 },
   { href: "/app/settings", label: "Settings", icon: Settings },
 ];
 
+const facilityNavItems = [
+  { href: "", label: "Dashboard", icon: LayoutDashboard },
+  { href: "setup", label: "Setup", icon: ClipboardList },
+  { href: "profile", label: "Profile", icon: FileText },
+  { href: "applicability", label: "Applicability", icon: ClipboardList },
+  { href: "assets", label: "Assets", icon: Box },
+  { href: "containment", label: "Containment", icon: Container },
+];
+
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const pathname = usePathname();
+  const facilityMatch = pathname.match(/^\/app\/facilities\/([^/]+)/);
+  const facilityId = facilityMatch?.[1];
+  const navItems = facilityId
+    ? facilityNavItems.map((item) => ({
+        ...item,
+        href: `/app/facilities/${facilityId}${item.href ? `/${item.href}` : ""}`,
+      }))
+    : globalNavItems;
 
   return (
     <aside
@@ -45,9 +66,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       <nav className="flex-1 space-y-0.5 p-2">
         {navItems.map((item) => {
           const isActive =
-            item.href === "/app"
-              ? pathname === "/app"
-              : pathname.startsWith(item.href);
+            item.href === "/app" ? pathname === "/app" : pathname === item.href;
           const Icon = item.icon;
           return (
             <Link

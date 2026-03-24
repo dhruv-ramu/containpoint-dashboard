@@ -26,16 +26,23 @@ export default async function AppLayout({
     );
   }
 
-  const facilityMemberships = await prisma.facilityMembership.findMany({
-    where: { userId: session.user.id },
-    include: { facility: true },
-    orderBy: { facility: { name: "asc" } },
-  });
-
-  const facilities = facilityMemberships.map((m) => ({
-    id: m.facility.id,
-    name: m.facility.name,
-  }));
+  // ORG_ADMIN sees all facilities; others see only their assigned facilities
+  const isOrgAdmin = orgMembership.role === "ORG_ADMIN";
+  const facilities = isOrgAdmin
+    ? (
+        await prisma.facility.findMany({
+          where: { organizationId: orgMembership.organizationId },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        })
+      )
+    : (
+        await prisma.facilityMembership.findMany({
+          where: { userId: session.user.id },
+          include: { facility: true },
+          orderBy: { facility: { name: "asc" } },
+        })
+      ).map((m) => ({ id: m.facility.id, name: m.facility.name }));
 
   return (
     <AppShell
