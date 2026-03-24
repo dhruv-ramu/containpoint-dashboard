@@ -28,6 +28,7 @@ ContainPoint is designed for facilities subject to the EPA's Spill Prevention, C
 - **5-year review & amendments** — Formal review workflow with amendment tracking
 - **Export center** — Generate Plan summaries, inspection reports, corrective action registers, training logs, incident logs, and full audit packs
 - **Consultant portfolio** — Multi-facility oversight for consultants and org admins
+- **Compliance assistant** — OpenAI chat with RAG over curated SPCC/product docs plus live facility data (tools)
 
 ---
 
@@ -67,6 +68,10 @@ Copy `.env.example` to `.env` and set:
 | `AUTH_URL`     | e.g. `http://localhost:3000`       |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (for file storage) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (for file storage) |
+| `OPENAI_API_KEY` | OpenAI API key for the facility **Assistant** (chat + embeddings) |
+| `OPENAI_CHAT_MODEL` | Optional chat model id (default `gpt-4o-mini`) |
+
+**Compliance assistant:** After `npx prisma migrate dev`, run `npm run ingest:knowledge` (requires `OPENAI_API_KEY` and `DATABASE_URL`) to embed markdown under `data/compliance-knowledge/` into `ComplianceKnowledgeChunk`. Add or edit those `.md` files, then re-run ingest to refresh RAG.
 
 **Supabase Storage (for Vercel / production):** When both Supabase env vars are set, uploaded files and exports are stored in Supabase instead of the local filesystem. Create a bucket named `uploads` in your Supabase project (Storage → New bucket). If Supabase is not configured, files use `./uploads` locally.
 

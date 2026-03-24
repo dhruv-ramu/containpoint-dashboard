@@ -19,6 +19,7 @@ import {
   Flame,
   Download,
   ScrollText,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,7 @@ const facilityNavItems = [
   { href: "training", label: "Training", icon: GraduationCap },
   { href: "incidents", label: "Incidents", icon: Flame },
   { href: "exports", label: "Exports", icon: Download },
+  { href: "assistant", label: "Assistant", icon: Sparkles },
   { href: "obligations", label: "Obligations", icon: CalendarCheck },
 ];
 

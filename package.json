@@ -12,6 +12,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:push": "prisma db push",
+    "ingest:knowledge": "tsx scripts/ingest-compliance-knowledge.ts",
     "screenshots": "tsx scripts/capture-screenshots.ts"
   },
   "prisma": {
