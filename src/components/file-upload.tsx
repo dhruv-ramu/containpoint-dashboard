@@ -40,8 +40,8 @@ export function FileUpload({ facilityId, objectType, objectId, onUploaded }: Pro
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        setError(err.error ?? "Upload failed");
+        const err = await res.json().catch(() => ({}));
+        setError(typeof err.error === "string" ? err.error : "Upload failed");
         return;
       }
 

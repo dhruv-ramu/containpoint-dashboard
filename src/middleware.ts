@@ -13,7 +13,9 @@ export async function middleware(req: NextRequest) {
 
   const isLoginPage = pathname === "/login" || pathname.startsWith("/login/");
   const isAuthApi = pathname.startsWith("/api/auth");
-  const isPublic = isLoginPage || isAuthApi;
+  const isLegalPage = pathname === "/terms" || pathname === "/privacy";
+  const isHealthCheck = pathname === "/api/health";
+  const isPublic = isLoginPage || isAuthApi || isLegalPage || isHealthCheck;
 
   if (isPublic) {
     if (isLoginPage && isLoggedIn) {

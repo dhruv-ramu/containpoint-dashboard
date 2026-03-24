@@ -48,6 +48,8 @@ export function getFileExtension(mimeType: string): string {
     "application/pdf": "pdf",
     "application/msword": "doc",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "text/plain": "txt",
+    "text/csv": "csv",
   };
   return map[mimeType] ?? "bin";
 }

@@ -95,6 +95,11 @@ function LoginForm() {
                 Register
               </Link>
             </p>
+            <p className="mt-6 pt-4 border-t border-[var(--border)] text-center text-xs text-[var(--muted)]">
+              <Link href="/terms" className="hover:underline">Terms of Service</Link>
+              {" · "}
+              <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+            </p>
           </CardContent>
         </Card>
       </div>

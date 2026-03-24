@@ -5,6 +5,20 @@ import { recordAuditEvent } from "@/lib/audit";
 import { saveFile, getFileExtension } from "@/lib/storage";
 import { createHash } from "crypto";
 import { FileObjectType } from "@/generated/prisma/enums";
+import { checkRateLimit, getClientIdentifier } from "@/lib/rate-limit";
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_MIMES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+  "text/csv",
+];
 
 async function checkAccess(facilityId: string, userId: string) {
   return prisma.facility.findFirst({
@@ -29,6 +43,15 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const ip = getClientIdentifier(req);
+  const rateLimit = checkRateLimit(`files:${ip}`, 30);
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: "Too many uploads. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfter) } }
+    );
+  }
+
   const { facilityId } = await params;
   const facility = await checkAccess(facilityId, session.user.id);
   if (!facility) {
@@ -50,6 +73,20 @@ export async function POST(
 
   if (!OBJECT_TYPES.includes(objectType as FileObjectType)) {
     return NextResponse.json({ error: "Invalid objectType" }, { status: 400 });
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    return NextResponse.json(
+      { error: `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024} MB.` },
+      { status: 400 }
+    );
+  }
+
+  if (!ALLOWED_MIMES.includes(file.type)) {
+    return NextResponse.json(
+      { error: "File type not allowed. Allowed: images, PDF, Word, text, CSV." },
+      { status: 400 }
+    );
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());

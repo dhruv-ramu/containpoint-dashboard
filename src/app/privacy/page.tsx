@@ -1,7 +1,14 @@
+import Link from "next/link";
+
 export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-[var(--bone)] py-12 px-4">
       <div className="max-w-3xl mx-auto">
+        <p className="mb-6">
+          <Link href="/login" className="text-sm text-[var(--muted)] hover:underline">
+            ← Back to login
+          </Link>
+        </p>
         <h1 className="font-serif text-2xl font-semibold tracking-tight">
           Privacy Policy
         </h1>

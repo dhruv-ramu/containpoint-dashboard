@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
+import { checkRateLimit, getClientIdentifier } from "@/lib/rate-limit";
 
 const RegisterSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -13,6 +14,15 @@ const RegisterSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIdentifier(req);
+    const rateLimit = checkRateLimit(`register:${ip}`, 5);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: { form: "Too many registration attempts. Please try again later." } },
+        { status: 429, headers: { "Retry-After": String(rateLimit.retryAfter) } }
+      );
+    }
+
     const body = await req.json();
     const parsed = RegisterSchema.safeParse(body);
     if (!parsed.success) {
