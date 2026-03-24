@@ -1,14 +1,23 @@
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { withAccelerate } from "@prisma/extension-accelerate";
 import { OilTypeCategory, UserRole, FacilityStatus } from "../src/generated/prisma/enums";
 import * as bcrypt from "bcryptjs";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL required for seed");
 
-const adapter = new PrismaPg({ connectionString: url });
-const prisma = new PrismaClient({ adapter });
+const isAccelerate =
+  url.startsWith("prisma://") || url.startsWith("prisma+postgres://");
+
+const prisma = isAccelerate
+  ? (new PrismaClient({
+      accelerateUrl: url,
+    }).$extends(withAccelerate()) as unknown as InstanceType<typeof PrismaClient>)
+  : new PrismaClient({
+      adapter: new PrismaPg({ connectionString: url }),
+    });
 
 async function main() {
   // Seed oil types

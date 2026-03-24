@@ -173,7 +173,7 @@ export function SetupWizard(props: Props) {
   });
 
   const step2Form = useForm<Step2Data>({
-    resolver: zodResolver(step2Schema),
+    resolver: zodResolver(step2Schema) as any,
     defaultValues: state.step2 ?? {
       nonTransportationRelated: true,
       aggregateAbovegroundCapacityGallons: 0,
@@ -187,7 +187,7 @@ export function SetupWizard(props: Props) {
   });
 
   const step3Form = useForm<Step3Data>({
-    resolver: zodResolver(step3Schema),
+    resolver: zodResolver(step3Schema) as any,
     defaultValues: state.step3 ?? {
       singleDischargeGt1000Last3Years: false,
       twoDischargesGt42Within12MonthsLast3Years: false,
@@ -195,7 +195,7 @@ export function SetupWizard(props: Props) {
   });
 
   const step4Form = useForm<Step4Data>({
-    resolver: zodResolver(step4Schema),
+    resolver: zodResolver(step4Schema) as any,
     defaultValues: state.step4 ?? {},
   });
 

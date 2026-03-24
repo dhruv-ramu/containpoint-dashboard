@@ -32,8 +32,8 @@ export async function recordAuditEvent(params: AuditParams) {
       objectType: params.objectType,
       objectId: params.objectId ?? null,
       action: params.action,
-      beforeJson: params.beforeJson ? (params.beforeJson as object) : null,
-      afterJson: params.afterJson ? (params.afterJson as object) : null,
+      beforeJson: params.beforeJson ?? undefined,
+      afterJson: params.afterJson ?? undefined,
     },
   });
 }

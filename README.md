@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ContainPoint
 
-## Getting Started
+**SPCC Compliance System of Record** — A production-quality B2B compliance SaaS for qualified Tier I and Tier II facilities.
 
-First, run the development server:
+## Tech stack
+
+- **Next.js 16** with TypeScript, App Router
+- **Tailwind CSS** for styling
+- **PostgreSQL** with **Prisma 7** ORM
+- **NextAuth v5** (credentials provider)
+- **Zod** for validation
+- **React Hook Form** for forms
+
+## Getting started
+
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL (or use [Prisma's local Postgres](https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration/databases) with `npx prisma dev`)
+
+### Database setup
+
+**Option A: Standard PostgreSQL**
+
+1. Create a database: `createdb containpoint`
+2. Set in `.env`:
+   ```
+   DATABASE_URL="postgresql://user:password@localhost:5432/containpoint"
+   ```
+
+**Option B: Prisma Postgres (local dev)**
+
+1. Run `npx prisma dev` to start local Postgres
+2. Use the `DATABASE_URL` from the output (or the one in `.env` if already configured)
+
+### Environment variables
+
+Copy `.env.example` to `.env` and configure:
+
+- `DATABASE_URL` — PostgreSQL connection string (must use `postgresql://` for the app; Prisma migrations support `prisma+postgres://` for Prisma dev)
+- `AUTH_SECRET` — Generate with `openssl rand -base64 32`
+- `AUTH_URL` — e.g. `http://localhost:3000`
+
+### Install and run
 
 ```bash
+npm install
+npx prisma migrate dev   # Create tables
+npm run db:seed          # Seed oil types and demo user
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Demo credentials
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+After seeding:
 
-## Learn More
+- **Email:** admin@containpoint.com
+- **Password:** demo1234
 
-To learn more about Next.js, take a look at the following resources:
+## Phase 1 scope
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- ✅ App shell with sidebar, top bar, facility switcher
+- ✅ Authentication (credentials) and organizations
+- ✅ Role-based access (ORG_ADMIN, FACILITY_MANAGER, INSPECTOR, REVIEWER, READ_ONLY_AUDITOR)
+- ✅ Facilities and facility membership
+- ✅ Applicability + qualification wizard (5 steps)
+- ✅ Facility master record / profile
+- ✅ Asset registry (list, create, edit, details)
+- ✅ Containment registry (list, create, edit, details)
+- ✅ Basic file attachments (facility-level)
+- ✅ Audit logging for key events
+- ✅ Dashboard with real data
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Assumptions
 
-## Deploy on Vercel
+- **Database:** Standard PostgreSQL; Prisma 7 requires `@prisma/adapter-pg` and `postgresql://` URL for runtime.
+- **File storage:** Local filesystem (`./uploads`) in development; abstraction allows S3/R2 later.
+- **Roles:** ORG_ADMIN sees all facilities; others see only assigned facilities.
+- **Tenancy:** Explicit facility membership; no cross-facility data leakage.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Recommended Phase 2 steps
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **Inspections engine** — Templates, scheduled inspections, execution with signed records
+2. **Corrective actions** — Workflow from failed inspection items
+3. **Training & annual briefings** — Personnel records, events, signoffs
+4. **5-year review workflow** — Amendment tracking, plan versioning
+5. **Audit pack / export center** — PDF generation, ZIP bundles
+6. **Asset–containment linking UI** — Full CRUD for links in asset form
+7. **File downloads** — Serve uploaded files via API
+8. **Facility membership management** — Add/remove users, assign roles

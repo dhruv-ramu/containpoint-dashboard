@@ -12,7 +12,13 @@ import {
 type FacilityWithRelations = {
   id: string;
   name: string;
-  profile: { nextFiveYearReviewDate: Date | null } | null;
+  profile: {
+    legalName?: string | null;
+    addressLine1?: string | null;
+    city?: string | null;
+    state?: string | null;
+    nextFiveYearReviewDate?: Date | null;
+  } | null;
   accountablePerson: { name: string } | null;
   applicability: { spccApplicable: boolean }[];
   qualification: { tier: string; qualifiedFacility: boolean }[];
