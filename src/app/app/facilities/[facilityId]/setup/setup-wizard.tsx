@@ -168,7 +168,7 @@ export function SetupWizard(props: Props) {
   }));
 
   const step1Form = useForm<Step1Data>({
-    resolver: zodResolver(step1Schema),
+    resolver: zodResolver(step1Schema) as any,
     defaultValues: state.step1 ?? { name: props.facilityName },
   });
 

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { recordAuditEvent } from "@/lib/audit";
-import { AssetType } from "@/generated/prisma";
+import { AssetType } from "@/generated/prisma/enums";
 
 async function checkAccess(facilityId: string, userId: string) {
   return prisma.facility.findFirst({

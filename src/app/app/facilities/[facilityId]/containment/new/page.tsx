@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { FacilityProfileForm } from "./profile-form";
-import { FacilityFilesSection } from "./files-section";
+import { ContainmentForm } from "../containment-form";
 
 async function getFacility(facilityId: string, userId: string) {
   return prisma.facility.findFirst({
@@ -13,14 +12,10 @@ async function getFacility(facilityId: string, userId: string) {
         { memberships: { some: { userId } } },
       ],
     },
-    include: {
-      profile: true,
-      files: { orderBy: { uploadedAt: "desc" } },
-    },
   });
 }
 
-export default async function ProfilePage({
+export default async function NewContainmentPage({
   params,
 }: {
   params: Promise<{ facilityId: string }>;
@@ -32,28 +27,17 @@ export default async function ProfilePage({
   const facility = await getFacility(facilityId, session.user.id);
   if (!facility) notFound();
 
-  const facilityFiles = facility.files.filter(
-    (f) => f.objectType === "FACILITY" && f.objectId === facilityId
-  );
-
   return (
     <div className="max-w-2xl space-y-6">
       <div>
         <h1 className="font-serif text-2xl font-semibold tracking-tight">
-          Facility profile
+          Add containment unit
         </h1>
         <p className="text-[var(--muted)] mt-1">
-          Legal and operational details for {facility.name}
+          Register a secondary containment structure
         </p>
       </div>
-      <FacilityProfileForm
-        facilityId={facility.id}
-        initial={facility.profile}
-      />
-      <FacilityFilesSection
-        facilityId={facilityId}
-        files={facilityFiles}
-      />
+      <ContainmentForm facilityId={facilityId} />
     </div>
   );
 }

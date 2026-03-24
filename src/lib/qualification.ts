@@ -1,4 +1,4 @@
-import type { QualificationTier } from "@/generated/prisma";
+import type { QualificationTier } from "@/generated/prisma/enums";
 
 export type QualificationInput = {
   spccApplicable: boolean;

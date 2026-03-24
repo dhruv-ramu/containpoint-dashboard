@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AssetType } from "@/generated/prisma";
+import { AssetType } from "@/generated/prisma/enums";
 
 const schema = z.object({
   assetCode: z.string().min(1, "Asset code is required"),
@@ -73,7 +73,7 @@ export function AssetForm({
   const [saving, setSaving] = useState(false);
 
   const form = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       assetCode: initial?.assetCode ?? "",
       name: initial?.name ?? "",

@@ -64,7 +64,7 @@ export function FacilityProfileForm({ facilityId, initial }: Props) {
   const [saving, setSaving] = useState(false);
 
   const form = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       legalName: initial?.legalName ?? "",
       dbaName: initial?.dbaName ?? "",

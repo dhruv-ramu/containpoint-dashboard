@@ -1,7 +1,14 @@
-import { PrismaClient, OilTypeCategory, UserRole, FacilityStatus } from "../src/generated/prisma";
+import "dotenv/config";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { OilTypeCategory, UserRole, FacilityStatus } from "../src/generated/prisma/enums";
 import * as bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient();
+const url = process.env.DATABASE_URL;
+if (!url) throw new Error("DATABASE_URL required for seed");
+
+const adapter = new PrismaPg({ connectionString: url });
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   // Seed oil types
