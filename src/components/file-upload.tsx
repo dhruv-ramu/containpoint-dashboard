@@ -5,16 +5,21 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload } from "lucide-react";
+import { ImagePlus, Upload } from "lucide-react";
+import type { FileObjectType } from "@/generated/prisma/enums";
 
 type Props = {
   facilityId: string;
-  objectType: "FACILITY" | "ASSET" | "CONTAINMENT_UNIT";
+  objectType: FileObjectType;
   objectId: string;
   onUploaded?: () => void;
+  /** When true, file picker defaults to images only (optional filter) */
+  photosOnly?: boolean;
+  /** Override button label */
+  label?: string;
 };
 
-export function FileUpload({ facilityId, objectType, objectId, onUploaded }: Props) {
+export function FileUpload({ facilityId, objectType, objectId, onUploaded, photosOnly, label }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -58,14 +63,16 @@ export function FileUpload({ facilityId, objectType, objectId, onUploaded }: Pro
 
   return (
     <div className="space-y-2">
-      <Label>Upload file</Label>
+      <Label>{label ?? (photosOnly ? "Add photo (optional)" : "Upload file (optional)")}</Label>
       <div className="flex gap-2 items-center">
         <input
           ref={inputRef}
           type="file"
+          accept={photosOnly ? "image/jpeg,image/png,image/gif,image/webp" : undefined}
           onChange={handleFileSelect}
           disabled={uploading}
           className="hidden"
+          aria-label={photosOnly ? "Add photo" : "Choose file to upload"}
         />
         <Button
           type="button"
@@ -73,8 +80,12 @@ export function FileUpload({ facilityId, objectType, objectId, onUploaded }: Pro
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
         >
-          <Upload className="h-4 w-4 mr-2" />
-          {uploading ? "Uploading..." : "Choose file"}
+          {photosOnly ? (
+            <ImagePlus className="h-4 w-4 mr-2" />
+          ) : (
+            <Upload className="h-4 w-4 mr-2" />
+          )}
+          {uploading ? "Uploading..." : photosOnly ? "Add photo" : "Choose file"}
         </Button>
         <Input
           placeholder="Caption (optional)"

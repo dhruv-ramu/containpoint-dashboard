@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AttachmentsSection } from "@/components/attachments-section";
 
 async function getFacility(facilityId: string, userId: string) {
   return prisma.facility.findFirst({
@@ -14,6 +15,14 @@ async function getFacility(facilityId: string, userId: string) {
         { memberships: { some: { userId } } },
       ],
     },
+  });
+}
+
+async function getActionFiles(facilityId: string, actionId: string) {
+  return prisma.fileAsset.findMany({
+    where: { facilityId, objectType: "CORRECTIVE_ACTION", objectId: actionId },
+    orderBy: { uploadedAt: "desc" },
+    select: { id: true, fileName: true, mimeType: true, caption: true, uploadedAt: true },
   });
 }
 
@@ -29,15 +38,18 @@ export default async function CorrectiveActionDetailPage({
   const facility = await getFacility(facilityId, session.user.id);
   if (!facility) notFound();
 
-  const action = await prisma.correctiveAction.findFirst({
-    where: { id: actionId, facilityId },
-    include: {
-      asset: true,
-      owner: { select: { name: true } },
-      verifiedBy: { select: { name: true } },
-      regulatoryRequirement: true,
-    },
-  });
+  const [action, files] = await Promise.all([
+    prisma.correctiveAction.findFirst({
+      where: { id: actionId, facilityId },
+      include: {
+        asset: true,
+        owner: { select: { name: true } },
+        verifiedBy: { select: { name: true } },
+        regulatoryRequirement: true,
+      },
+    }),
+    getActionFiles(facilityId, actionId),
+  ]);
 
   if (!action) notFound();
 
@@ -128,6 +140,15 @@ export default async function CorrectiveActionDetailPage({
           )}
         </CardContent>
       </Card>
+
+      <AttachmentsSection
+        facilityId={facilityId}
+        objectType="CORRECTIVE_ACTION"
+        objectId={actionId}
+        files={files}
+        title="Photos & attachments"
+        subtitle="Add optional photos of the finding or closure evidence"
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AttachmentsSection } from "@/components/attachments-section";
 
 async function getAsset(facilityId: string, assetId: string, userId: string) {
   return prisma.asset.findFirst({
@@ -26,6 +27,14 @@ async function getAsset(facilityId: string, assetId: string, userId: string) {
   });
 }
 
+async function getAssetFiles(facilityId: string, assetId: string) {
+  return prisma.fileAsset.findMany({
+    where: { facilityId, objectType: "ASSET", objectId: assetId },
+    orderBy: { uploadedAt: "desc" },
+    select: { id: true, fileName: true, mimeType: true, caption: true, uploadedAt: true },
+  });
+}
+
 export default async function AssetDetailPage({
   params,
 }: {
@@ -35,7 +44,10 @@ export default async function AssetDetailPage({
   if (!session?.user?.id) return null;
 
   const { facilityId, assetId } = await params;
-  const asset = await getAsset(facilityId, assetId, session.user.id);
+  const [asset, files] = await Promise.all([
+    getAsset(facilityId, assetId, session.user.id),
+    getAssetFiles(facilityId, assetId),
+  ]);
   if (!asset) notFound();
 
   return (
@@ -132,6 +144,15 @@ export default async function AssetDetailPage({
           </CardContent>
         </Card>
       )}
+
+      <AttachmentsSection
+        facilityId={facilityId}
+        objectType="ASSET"
+        objectId={assetId}
+        files={files}
+        title="Photos & attachments"
+        subtitle="Add optional photos of the asset or related documents"
+      />
 
       <div className="flex gap-2">
         <Button variant="outline" asChild>

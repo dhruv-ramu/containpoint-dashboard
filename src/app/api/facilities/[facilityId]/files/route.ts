@@ -32,7 +32,15 @@ async function checkAccess(facilityId: string, userId: string) {
   });
 }
 
-const OBJECT_TYPES: FileObjectType[] = ["FACILITY", "ASSET", "CONTAINMENT_UNIT"];
+const OBJECT_TYPES: FileObjectType[] = [
+  "FACILITY",
+  "ASSET",
+  "CONTAINMENT_UNIT",
+  "INSPECTION_RUN",
+  "CORRECTIVE_ACTION",
+  "TRAINING_EVENT",
+  "INCIDENT",
+];
 
 export async function POST(
   req: Request,

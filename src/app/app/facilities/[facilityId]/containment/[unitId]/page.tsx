@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AttachmentsSection } from "@/components/attachments-section";
 
 async function getUnit(facilityId: string, unitId: string, userId: string) {
   return prisma.containmentUnit.findFirst({
@@ -23,6 +24,14 @@ async function getUnit(facilityId: string, unitId: string, userId: string) {
   });
 }
 
+async function getUnitFiles(facilityId: string, unitId: string) {
+  return prisma.fileAsset.findMany({
+    where: { facilityId, objectType: "CONTAINMENT_UNIT", objectId: unitId },
+    orderBy: { uploadedAt: "desc" },
+    select: { id: true, fileName: true, mimeType: true, caption: true, uploadedAt: true },
+  });
+}
+
 export default async function ContainmentDetailPage({
   params,
 }: {
@@ -32,7 +41,10 @@ export default async function ContainmentDetailPage({
   if (!session?.user?.id) return null;
 
   const { facilityId, unitId } = await params;
-  const unit = await getUnit(facilityId, unitId, session.user.id);
+  const [unit, files] = await Promise.all([
+    getUnit(facilityId, unitId, session.user.id),
+    getUnitFiles(facilityId, unitId),
+  ]);
   if (!unit) notFound();
 
   return (
@@ -121,6 +133,15 @@ export default async function ContainmentDetailPage({
           </CardContent>
         </Card>
       )}
+
+      <AttachmentsSection
+        facilityId={facilityId}
+        objectType="CONTAINMENT_UNIT"
+        objectId={unitId}
+        files={files}
+        title="Photos & attachments"
+        subtitle="Add optional photos of the containment unit or related documents"
+      />
 
       <div className="flex gap-2">
         <Button variant="outline" asChild>
