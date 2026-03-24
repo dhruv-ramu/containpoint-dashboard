@@ -9,6 +9,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["@react-pdf/renderer"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

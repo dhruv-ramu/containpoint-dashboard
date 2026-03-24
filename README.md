@@ -216,7 +216,7 @@ The **Export Center** generates compliance documents from live data. Available e
 | Incident log           | Spill/discharge history                   |
 | **Full audit pack**    | Bundled compliance evidence               |
 
-Select a type, click **Generate**, and the system creates an HTML artifact. Completed exports appear in the history table with a download link.
+Select a type, click **Generate**, and the system creates a PDF artifact. Completed exports appear in the history table with a download link.
 
 ---
 
