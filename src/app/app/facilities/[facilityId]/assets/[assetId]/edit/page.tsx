@@ -80,6 +80,11 @@ export default async function EditAssetPage({
     integrityTestingBasis: asset.integrityTestingBasis ?? undefined,
     inspectionFrequencyDays: asset.inspectionFrequencyDays ?? undefined,
     comments: asset.comments ?? undefined,
+    assetClass: asset.assetClass ?? undefined,
+    modeState: asset.modeState ?? undefined,
+    requiresSizedContainment: asset.requiresSizedContainment ?? false,
+    underDirectControl: asset.underDirectControl ?? undefined,
+    containmentValidationBasis: asset.containmentValidationBasis ?? undefined,
   };
 
   return (

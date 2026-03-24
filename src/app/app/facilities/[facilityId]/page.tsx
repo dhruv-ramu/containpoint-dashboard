@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { computeValidation } from "@/lib/validation";
 import { FacilityDashboard } from "./facility-dashboard";
 
 async function getFacility(facilityId: string, userId: string) {
-  const facility = await prisma.facility.findFirst({
+  return prisma.facility.findFirst({
     where: {
       id: facilityId,
       OR: [
@@ -20,7 +21,6 @@ async function getFacility(facilityId: string, userId: string) {
       _count: { select: { assets: true, containmentUnits: true, files: true } },
     },
   });
-  return facility;
 }
 
 export default async function FacilityPage({
@@ -35,5 +35,61 @@ export default async function FacilityPage({
   const facility = await getFacility(facilityId, session.user.id);
   if (!facility) notFound();
 
-  return <FacilityDashboard facility={facility} />;
+  const [validation, overdueInspections, overdueActions, upcomingInspections, trainingSummary] =
+    await Promise.all([
+      computeValidation(facilityId),
+      prisma.scheduledInspection.findMany({
+        where: {
+          facilityId,
+          status: { notIn: ["completed", "canceled"] },
+          dueDate: { lt: new Date() },
+        },
+        include: { template: true, asset: true },
+        orderBy: { dueDate: "asc" },
+        take: 10,
+      }),
+      prisma.correctiveAction.findMany({
+        where: {
+          facilityId,
+          status: { notIn: ["CLOSED", "ACCEPTED_RISK"] },
+          dueDate: { lt: new Date() },
+        },
+        include: { asset: true },
+        orderBy: { dueDate: "asc" },
+        take: 10,
+      }),
+      prisma.scheduledInspection.findMany({
+        where: {
+          facilityId,
+          status: { notIn: ["completed", "canceled"] },
+          dueDate: { gte: new Date() },
+        },
+        include: { template: true, asset: true },
+        orderBy: { dueDate: "asc" },
+        take: 5,
+      }),
+      prisma.trainingEvent.findMany({
+        where: { facilityId, type: "ANNUAL_BRIEFING" },
+        orderBy: { eventDate: "desc" },
+        take: 1,
+      }).then((events) => {
+        const latest = events[0];
+        const hasRecentBriefing =
+          latest &&
+          new Date(latest.eventDate) >
+            new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+        return { hasRecentBriefing: !!hasRecentBriefing, latestDate: latest?.eventDate };
+      }),
+    ]);
+
+  return (
+    <FacilityDashboard
+      facility={facility}
+      validation={validation}
+      overdueInspections={overdueInspections}
+      overdueActions={overdueActions}
+      upcomingInspections={upcomingInspections}
+      trainingSummary={trainingSummary}
+    />
+  );
 }

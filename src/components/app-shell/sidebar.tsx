@@ -15,12 +15,17 @@ import {
   AlertTriangle,
   GraduationCap,
   CalendarCheck,
+  LayoutGrid,
+  Flame,
+  Download,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const globalNavItems = [
   { href: "/app", label: "Dashboard", icon: LayoutDashboard },
   { href: "/app/facilities", label: "Facilities", icon: Building2 },
+  { href: "/app/portfolio", label: "Portfolio", icon: LayoutGrid },
   { href: "/app/settings", label: "Settings", icon: Settings },
 ];
 
@@ -31,9 +36,12 @@ const facilityNavItems = [
   { href: "applicability", label: "Applicability", icon: ClipboardList },
   { href: "assets", label: "Assets", icon: Box },
   { href: "containment", label: "Containment", icon: Container },
+  { href: "plan", label: "Plan", icon: ScrollText },
   { href: "inspections", label: "Inspections", icon: ClipboardCheck },
   { href: "corrective-actions", label: "Corrective Actions", icon: AlertTriangle },
   { href: "training", label: "Training", icon: GraduationCap },
+  { href: "incidents", label: "Incidents", icon: Flame },
+  { href: "exports", label: "Exports", icon: Download },
   { href: "obligations", label: "Obligations", icon: CalendarCheck },
 ];
 

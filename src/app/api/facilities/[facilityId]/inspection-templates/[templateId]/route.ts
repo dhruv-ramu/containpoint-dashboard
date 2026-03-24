@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { recordAuditEvent } from "@/lib/audit";
-import { AssetClass, InspectionType } from "@/generated/prisma/enums";
+import { AssetClass, InspectionType, CorrectiveActionSeverity } from "@/generated/prisma/enums";
 
 async function checkAccess(facilityId: string, userId: string) {
   return prisma.facility.findFirst({
@@ -134,8 +134,8 @@ export async function PUT(
           prompt: it.prompt,
           responseType: it.responseType,
           required: it.required ?? false,
-          acceptableRange: it.acceptableRange || null,
-          failureSeverity: it.failureSeverity || null,
+        acceptableRange: it.acceptableRange || null,
+        failureSeverity: (it.failureSeverity as CorrectiveActionSeverity) || null,
           regulatoryRequirementId: it.regulatoryRequirementId || null,
           autoCreateCorrectiveAction: it.autoCreateCorrectiveAction ?? false,
         })),

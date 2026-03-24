@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AssetType } from "@/generated/prisma/enums";
+import { AssetType, AssetClass, AssetModeState } from "@/generated/prisma/enums";
 
 const schema = z.object({
   assetCode: z.string().min(1, "Asset code is required"),
@@ -42,6 +42,11 @@ const schema = z.object({
   inspectionFrequencyDays: z.coerce.number().min(0).optional(),
   comments: z.string().optional(),
   containmentUnitIds: z.array(z.string()).optional(),
+  assetClass: z.nativeEnum(AssetClass).optional(),
+  modeState: z.nativeEnum(AssetModeState).optional(),
+  requiresSizedContainment: z.boolean().optional(),
+  underDirectControl: z.boolean().optional(),
+  containmentValidationBasis: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -95,6 +100,11 @@ export function AssetForm({
       integrityTestingBasis: initial?.integrityTestingBasis ?? "",
       inspectionFrequencyDays: initial?.inspectionFrequencyDays ?? undefined,
       comments: initial?.comments ?? "",
+      assetClass: initial?.assetClass ?? undefined,
+      modeState: initial?.modeState ?? undefined,
+      requiresSizedContainment: initial?.requiresSizedContainment ?? false,
+      underDirectControl: initial?.underDirectControl ?? undefined,
+      containmentValidationBasis: initial?.containmentValidationBasis ?? "",
     },
   });
 
@@ -154,6 +164,44 @@ export function AssetForm({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
+              <Label>Asset class (Phase 2)</Label>
+              <Select
+                value={form.watch("assetClass") ?? ""}
+                onValueChange={(v) => form.setValue("assetClass", v ? (v as AssetClass) : undefined)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(AssetClass).map(([k, v]) => (
+                    <SelectItem key={v} value={v}>
+                      {k.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {form.watch("assetClass") === "MOBILE_PORTABLE_CONTAINER" && (
+              <div className="space-y-2">
+                <Label>Mode state</Label>
+                <Select
+                  value={form.watch("modeState") ?? ""}
+                  onValueChange={(v) => form.setValue("modeState", v ? (v as AssetModeState) : undefined)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(AssetModeState).map(([k, v]) => (
+                      <SelectItem key={v} value={v}>
+                        {k.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-2">
               <Label>Asset type</Label>
               <Select
                 value={form.watch("assetType")}
@@ -200,7 +248,23 @@ export function AssetForm({
               <Input type="number" min={0} max={100} {...form.register("typicalFillPercent")} />
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="requiresSizedContainment"
+                checked={form.watch("requiresSizedContainment")}
+                onCheckedChange={(v) => form.setValue("requiresSizedContainment", !!v)}
+              />
+              <Label htmlFor="requiresSizedContainment">Requires sized containment</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="underDirectControl"
+                checked={form.watch("underDirectControl")}
+                onCheckedChange={(v) => form.setValue("underDirectControl", v === true)}
+              />
+              <Label htmlFor="underDirectControl">Under direct control</Label>
+            </div>
             <div className="flex items-center gap-2">
               <Checkbox
                 id="counted"
@@ -300,6 +364,14 @@ export function AssetForm({
           <CardTitle>Containment & comments</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Containment validation basis</Label>
+            <Textarea
+              {...form.register("containmentValidationBasis")}
+              rows={2}
+              placeholder="Basis for containment validation, if applicable"
+            />
+          </div>
           {containmentUnits.length > 0 && (
             <div className="space-y-2">
               <Label>Linked containment</Label>

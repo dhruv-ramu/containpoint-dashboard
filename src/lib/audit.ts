@@ -21,7 +21,17 @@ type AuditAction =
   | "training_event.created"
   | "obligation.created"
   | "obligation.resolved"
-  | "validation.result_changed";
+  | "validation.result_changed"
+  // Phase 3
+  | "plan_version.created"
+  | "plan_version.updated"
+  | "plan.approved"
+  | "plan_review.completed"
+  | "plan_amendment.created"
+  | "plan_amendment.updated"
+  | "incident.created"
+  | "incident.updated"
+  | "export.generated";
 
 type AuditParams = {
   organizationId?: string;

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { recordAuditEvent } from "@/lib/audit";
-import { AssetType } from "@/generated/prisma/enums";
+import { AssetType, AssetClass, AssetModeState } from "@/generated/prisma/enums";
 
 async function checkAccess(facilityId: string, userId: string) {
   return prisma.facility.findFirst({
@@ -14,6 +14,30 @@ async function checkAccess(facilityId: string, userId: string) {
       ],
     },
   });
+}
+
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ facilityId: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { facilityId } = await params;
+  const facility = await checkAccess(facilityId, session.user.id);
+  if (!facility) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const assets = await prisma.asset.findMany({
+    where: { facilityId, status: "ACTIVE" },
+    select: { id: true, assetCode: true, name: true },
+    orderBy: { assetCode: "asc" },
+  });
+
+  return NextResponse.json({ assets });
 }
 
 export async function POST(
@@ -68,6 +92,11 @@ export async function POST(
       integrityTestingBasis: body.integrityTestingBasis || null,
       inspectionFrequencyDays: body.inspectionFrequencyDays ?? null,
       comments: body.comments || null,
+      assetClass: body.assetClass ? (body.assetClass as AssetClass) : null,
+      modeState: body.modeState ? (body.modeState as AssetModeState) : null,
+      requiresSizedContainment: body.requiresSizedContainment ?? false,
+      underDirectControl: body.underDirectControl ?? undefined,
+      containmentValidationBasis: body.containmentValidationBasis || null,
     },
   });
 
