@@ -3,8 +3,10 @@ import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db";
 import * as bcrypt from "bcryptjs";
 import type { UserRole } from "@/generated/prisma/enums";
+import { verifyDashboardBridgeToken } from "@/lib/dashboard-bridge";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   providers: [
     Credentials({
       name: "credentials",
@@ -20,6 +22,49 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!user?.passwordHash) return null;
         const valid = await bcrypt.compare(String(credentials.password), user.passwordHash);
         if (!valid) return null;
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.image,
+        };
+      },
+    }),
+    Credentials({
+      id: "admin-bridge",
+      name: "admin-bridge",
+      credentials: {
+        token: { label: "Token", type: "text" },
+      },
+      async authorize(credentials) {
+        const raw = credentials?.token;
+        if (!raw || typeof raw !== "string") return null;
+        const payload = verifyDashboardBridgeToken(raw);
+        if (!payload) return null;
+
+        const facility = await prisma.facility.findFirst({
+          where: {
+            id: payload.facilityId,
+            OR: [
+              {
+                organization: {
+                  memberships: {
+                    some: { userId: payload.targetUserId, role: "ORG_ADMIN" },
+                  },
+                },
+              },
+              { memberships: { some: { userId: payload.targetUserId } } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (!facility) return null;
+
+        const user = await prisma.user.findUnique({
+          where: { id: payload.targetUserId },
+        });
+        if (!user) return null;
+
         return {
           id: user.id,
           email: user.email,

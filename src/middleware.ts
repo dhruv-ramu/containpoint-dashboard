@@ -18,7 +18,8 @@ export async function middleware(req: NextRequest) {
   const isPublic = isLoginPage || isAuthApi || isLegalPage || isHealthCheck;
 
   if (isPublic) {
-    if (isLoginPage && isLoggedIn) {
+    const adminBridge = req.nextUrl.searchParams.has("adminBridge");
+    if (isLoginPage && isLoggedIn && !adminBridge) {
       return NextResponse.redirect(new URL("/app", req.url));
     }
     return NextResponse.next();

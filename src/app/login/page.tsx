@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -8,15 +8,40 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { safeAppCallbackUrl } from "@/lib/safe-callback-url";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/app";
+  const adminBridge = searchParams.get("adminBridge");
+  const callbackUrl = safeAppCallbackUrl(searchParams.get("callbackUrl"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [bridgePending, setBridgePending] = useState(!!adminBridge);
+
+  useEffect(() => {
+    if (!adminBridge) return;
+    let cancelled = false;
+    (async () => {
+      const res = await signIn("admin-bridge", {
+        token: adminBridge,
+        redirect: false,
+      });
+      if (cancelled) return;
+      if (res?.error) {
+        setError("Support sign-in link is invalid or expired. Sign in with your email and password.");
+        setBridgePending(false);
+        return;
+      }
+      router.replace(callbackUrl);
+      router.refresh();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminBridge, router, callbackUrl]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,9 +80,16 @@ function LoginForm() {
         <Card className="shadow-card">
           <CardHeader className="space-y-1">
             <CardTitle className="font-serif text-xl">Sign in</CardTitle>
-            <CardDescription>Enter your credentials to access your account</CardDescription>
+            <CardDescription>
+              {bridgePending
+                ? "Completing sign-in from the internal admin console…"
+                : "Enter your credentials to access your account"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
+            {bridgePending && !error && (
+              <p className="text-sm text-[var(--muted)] mb-4">Redirecting to your workspace.</p>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
@@ -73,6 +105,7 @@ function LoginForm() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  disabled={bridgePending}
                 />
               </div>
               <div className="space-y-2">
@@ -83,9 +116,10 @@ function LoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  disabled={bridgePending}
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full" disabled={loading || bridgePending}>
                 {loading ? "Signing in..." : "Sign in"}
               </Button>
             </form>
