@@ -13,11 +13,18 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { createOpenAI } from "@ai-sdk/openai";
+import mammoth from "mammoth";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
 loadEnv({ path: path.join(ROOT, ".env") });
 const KNOWLEDGE_DIR = path.join(ROOT, "data", "compliance-knowledge");
+const REPO_ROOT = path.join(ROOT, "..");
+
+const MASTER_DOCX = [
+  "SPCC Master Compliance System Specification for ContainIQ.docx",
+  "spcc_startup_dossier.docx",
+] as const;
 
 const MAX_CHARS = 2800;
 
@@ -85,6 +92,19 @@ function chunkMarkdown(source: string, raw: string): { title: string; content: s
   return chunks;
 }
 
+function chunkPlainSource(source: string, raw: string): { title: string; content: string }[] {
+  const normalized = raw.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  if (normalized.length < 40) return [];
+  const chunks: { title: string; content: string }[] = [];
+  for (let i = 0; i < normalized.length; i += MAX_CHARS) {
+    chunks.push({
+      title: `${source} (part ${chunks.length + 1})`,
+      content: normalized.slice(i, i + MAX_CHARS),
+    });
+  }
+  return chunks;
+}
+
 async function main() {
   if (!process.env.DATABASE_URL) {
     console.error("DATABASE_URL is required");
@@ -109,11 +129,9 @@ async function main() {
 
   await withRetry("Database connect", () => prisma.$connect());
 
-  const files = fs.readdirSync(KNOWLEDGE_DIR).filter((f) => f.endsWith(".md"));
-  if (files.length === 0) {
-    console.error("No .md files in", KNOWLEDGE_DIR);
-    process.exit(1);
-  }
+  const files = fs.existsSync(KNOWLEDGE_DIR)
+    ? fs.readdirSync(KNOWLEDGE_DIR).filter((f) => f.endsWith(".md"))
+    : [];
 
   type Row = {
     source: string;
@@ -135,6 +153,30 @@ async function main() {
         content: p.content,
       });
     });
+  }
+
+  for (const name of MASTER_DOCX) {
+    const fp = path.join(REPO_ROOT, name);
+    if (!fs.existsSync(fp)) {
+      console.warn("Master docx not found (skipped):", fp);
+      continue;
+    }
+    const { value } = await mammoth.extractRawText({ path: fp });
+    const parts = chunkPlainSource(`master/${name}`, value);
+    parts.forEach((p, idx) => {
+      rows.push({
+        source: `master/${name}`,
+        chunkIndex: idx,
+        title: p.title,
+        content: p.content,
+      });
+    });
+    console.log(`Ingested master docx: ${name} (${parts.length} chunks)`);
+  }
+
+  if (rows.length === 0) {
+    console.error("No knowledge sources: add .md files under", KNOWLEDGE_DIR, "or place master .docx in repo root.");
+    process.exit(1);
   }
 
   await withRetry("Clear existing chunks", () => prisma.complianceKnowledgeChunk.deleteMany({}));

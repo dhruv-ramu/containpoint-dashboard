@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
+import { AssistantFab } from "@/components/assistant/AssistantFab";
 
 type Facility = { id: string; name: string };
 
@@ -38,6 +39,7 @@ export function AppShell({
         <main className="flex-1 overflow-auto bg-[var(--bone)] p-6">
           {children}
         </main>
+        <AssistantFab facilityId={currentFacilityId} facilities={facilities} />
       </div>
     </div>
   );

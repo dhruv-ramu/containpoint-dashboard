@@ -13,6 +13,7 @@ import { checkRateLimit, getClientIdentifier } from "@/lib/rate-limit";
 import { getChatModelId, getOpenAIProvider } from "@/lib/openai-provider";
 import { formatRagContext, searchComplianceKnowledge } from "@/lib/compliance-rag";
 import { buildFacilitySnapshotJson } from "@/lib/assistant-facility-snapshot";
+import { COMPLIANCE_DIAGRAM_IDS } from "@/lib/assistant-diagram-spec";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
@@ -30,13 +31,16 @@ async function checkAccess(facilityId: string, userId: string) {
   });
 }
 
-const SYSTEM = `You are ContainPoint Compliance Assistant, helping users understand SPCC-related obligations and how they appear in their ContainPoint workspace.
+const DIAGRAM_HINT = COMPLIANCE_DIAGRAM_IDS.join(", ");
+
+const SYSTEM = `You are ContainPoint Compliance Assistant, helping users understand SPCC-related obligations (40 CFR 112) and how they appear in their ContainPoint workspace.
 
 Rules:
-- Use the searchComplianceKnowledge tool for general regulatory or product-help questions (40 CFR 112 concepts, inspections, containment, training, what ContainPoint features do).
-- Use the getFacilitySnapshot tool whenever the user asks about THIS facility's data (what's due, counts, plan version, open actions, schedule, recent training/incidents).
+- Use searchComplianceKnowledge for regulatory/product questions. The index includes markdown guides plus the organization's master Word specifications where ingested—cite source titles when you rely on them.
+- Use getFacilitySnapshot whenever the user asks about THIS facility's data (what's due, counts, plan version, open actions, schedule, recent training/incidents).
+- Use renderComplianceDiagram when a short visual will clarify a concept (applicability flow, containment, inspection loop, tier qualification, plan amendments). Call it at most once per answer unless the user explicitly asks for multiple diagrams. Valid diagramId values: ${DIAGRAM_HINT}. Optionally pass a one-line caption tying the diagram to the user's question. The client shows your written answer first, then the embedded diagram—refer to it as "below" or "following," not as a linked image. Never use Markdown image syntax (![]()).
 - If tools return empty or errors, say so clearly. Never invent facility-specific numbers or dates.
-- Cite retrieved document titles when you lean on RAG results.
+- Answer in clear Markdown (headings, bullets, bold labels). The UI renders Markdown—do not wrap the whole answer in a single code fence.
 - Always remind the user that you are not a lawyer or PE and they must confirm requirements against their approved SPCC Plan and applicable regulations.`;
 
 export async function POST(
@@ -145,6 +149,18 @@ export async function POST(
           }
           return snap;
         },
+      }),
+      renderComplianceDiagram: tool({
+        description:
+          "Embed a predefined interactive-style diagram in the chat (client-rendered). Use for applicability, containment, inspections, qualification tiers, or plan amendment flows.",
+        inputSchema: z.object({
+          diagramId: z.enum(COMPLIANCE_DIAGRAM_IDS),
+          caption: z
+            .string()
+            .optional()
+            .describe("Short caption linking the diagram to the user's question."),
+        }),
+        execute: async ({ diagramId, caption }) => ({ diagramId, caption }),
       }),
     },
   });
