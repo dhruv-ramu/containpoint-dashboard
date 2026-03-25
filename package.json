@@ -13,7 +13,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:push": "prisma db push",
     "ingest:knowledge": "tsx scripts/ingest-compliance-knowledge.ts",
-    "screenshots": "tsx scripts/capture-screenshots.ts"
+    "screenshots": "tsx scripts/capture-screenshots.ts",
+    "test:e2e": "playwright test"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { determineQualification } from "@/lib/qualification";
+import { Check, Circle } from "lucide-react";
 
 const STEPS = [
   "Facility basics",
@@ -112,6 +114,7 @@ type Props = {
     twoDischargesGt42Within12MonthsLast3Years: boolean;
   } | null;
   userId: string;
+  completionHints: { assetCount: number };
 };
 
 export function SetupWizard(props: Props) {
@@ -280,6 +283,12 @@ export function SetupWizard(props: Props) {
         })()
       : null;
 
+  const hints = props.completionHints;
+  const hasApplicability = !!props.initialApplicability;
+  const hasQualification = !!props.initialQualification;
+  const hasAccountable = !!props.initialAccountable;
+  const hasAssets = hints.assetCount > 0;
+
   return (
     <div className="space-y-6">
       <div className="flex gap-2">
@@ -293,6 +302,95 @@ export function SetupWizard(props: Props) {
           />
         ))}
       </div>
+
+      <Card className="border-[var(--steel-blue)]/20 bg-[var(--mist-gray)]/25">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-serif">Facility readiness</CardTitle>
+          <p className="text-sm text-[var(--muted)]">
+            Progress outside this wizard is reflected from live data
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-3 text-sm">
+            <li className="flex gap-2 items-start">
+              {hasApplicability ? (
+                <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden />
+              ) : (
+                <Circle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" aria-hidden />
+              )}
+              <div>
+                <span className={hasApplicability ? "text-[var(--muted)]" : "font-medium"}>
+                  Applicability assessment on file
+                </span>
+                {!hasApplicability && (
+                  <p className="text-xs text-[var(--muted)] mt-0.5">
+                    Continue to step 2 in this wizard.
+                  </p>
+                )}
+              </div>
+            </li>
+            <li className="flex gap-2 items-start">
+              {hasQualification ? (
+                <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden />
+              ) : (
+                <Circle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" aria-hidden />
+              )}
+              <div>
+                <span className={hasQualification ? "text-[var(--muted)]" : "font-medium"}>
+                  Qualification assessment on file
+                </span>
+                {!hasQualification && (
+                  <p className="text-xs text-[var(--muted)] mt-0.5">
+                    Complete step 3 after applicability.
+                  </p>
+                )}
+              </div>
+            </li>
+            <li className="flex gap-2 items-start">
+              {hasAccountable ? (
+                <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden />
+              ) : (
+                <Circle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" aria-hidden />
+              )}
+              <div>
+                <span className={hasAccountable ? "text-[var(--muted)]" : "font-medium"}>
+                  Accountable person recorded
+                </span>
+                {!hasAccountable && (
+                  <p className="text-xs text-[var(--muted)] mt-0.5">Complete step 4 in this wizard.</p>
+                )}
+              </div>
+            </li>
+            <li className="flex gap-2 items-start">
+              {hasAssets ? (
+                <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden />
+              ) : (
+                <Circle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" aria-hidden />
+              )}
+              <div>
+                {hasAssets ? (
+                  <span className="text-[var(--muted)]">
+                    {hints.assetCount} asset{hints.assetCount === 1 ? "" : "s"} in registry
+                  </span>
+                ) : (
+                  <>
+                    <span className="font-medium">Asset registry</span>
+                    <p className="text-xs text-[var(--muted)] mt-0.5">
+                      <Link
+                        href={`/app/facilities/${props.facilityId}/assets/new`}
+                        className="text-[var(--steel-blue)] hover:underline"
+                      >
+                        Add your first asset
+                      </Link>{" "}
+                      when the wizard is far enough along for your process.
+                    </p>
+                  </>
+                )}
+              </div>
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
 
       {error && (
         <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">

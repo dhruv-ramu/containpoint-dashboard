@@ -24,7 +24,9 @@ async function getPortfolioData(userId: string) {
           _count: {
             select: {
               assets: true,
-              correctiveActions: true,
+              correctiveActions: {
+                where: { status: { notIn: ["CLOSED", "ACCEPTED_RISK"] } },
+              },
             },
           },
         },
@@ -42,7 +44,9 @@ async function getPortfolioData(userId: string) {
                 _count: {
                   select: {
                     assets: true,
-                    correctiveActions: true,
+                    correctiveActions: {
+                      where: { status: { notIn: ["CLOSED", "ACCEPTED_RISK"] } },
+                    },
                   },
                 },
               },
@@ -104,11 +108,32 @@ async function getPortfolioData(userId: string) {
     ])
   );
 
+  const upcomingInspections =
+    facilityIds.length > 0
+      ? await prisma.scheduledInspection.findMany({
+          where: {
+            facilityId: { in: facilityIds },
+            status: { notIn: ["completed", "canceled"] },
+            dueDate: { gte: new Date() },
+          },
+          orderBy: { dueDate: "asc" },
+          include: { facility: { select: { id: true, name: true } }, template: true },
+        })
+      : [];
+
+  const nextInspectionByFacility = new Map<string, (typeof upcomingInspections)[0]>();
+  for (const s of upcomingInspections) {
+    if (!nextInspectionByFacility.has(s.facilityId)) {
+      nextInspectionByFacility.set(s.facilityId, s);
+    }
+  }
+
   return {
     facilities,
     overdueInspections,
     overdueActions,
     briefingByFacility,
+    nextInspectionByFacility,
   };
 }
 
@@ -119,7 +144,7 @@ export default async function PortfolioPage() {
   const data = await getPortfolioData(session.user.id);
   if (!data) redirect("/app");
 
-  const { facilities, overdueInspections, overdueActions, briefingByFacility } =
+  const { facilities, overdueInspections, overdueActions, briefingByFacility, nextInspectionByFacility } =
     data;
 
   if (facilities.length === 0) {
@@ -150,6 +175,55 @@ export default async function PortfolioPage() {
         <p className="text-[var(--muted)] mt-1">
           Multi-facility compliance overview
         </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-xs font-medium text-[var(--muted)]">Facilities</p>
+            <p className="text-2xl font-semibold tabular-nums mt-1">{facilities.length}</p>
+          </CardContent>
+        </Card>
+        <Card
+          className={
+            overdueInspections.length > 0 ? "border-amber-200 bg-amber-50/40" : ""
+          }
+        >
+          <CardContent className="pt-4">
+            <p className="text-xs font-medium text-[var(--muted)]">Overdue inspections</p>
+            <p
+              className={`text-2xl font-semibold tabular-nums mt-1 ${
+                overdueInspections.length > 0 ? "text-amber-800" : ""
+              }`}
+            >
+              {overdueInspections.length}
+            </p>
+          </CardContent>
+        </Card>
+        <Card
+          className={overdueActions.length > 0 ? "border-amber-200 bg-amber-50/40" : ""}
+        >
+          <CardContent className="pt-4">
+            <p className="text-xs font-medium text-[var(--muted)]">Overdue corrective actions</p>
+            <p
+              className={`text-2xl font-semibold tabular-nums mt-1 ${
+                overdueActions.length > 0 ? "text-amber-800" : ""
+              }`}
+            >
+              {overdueActions.length}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-xs font-medium text-[var(--muted)]">Facilities w/ open actions</p>
+            <p className="text-2xl font-semibold tabular-nums mt-1">
+              {
+                facilities.filter((f) => (f._count.correctiveActions ?? 0) > 0).length
+              }
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {(overdueInspections.length > 0 || overdueActions.length > 0) && (
@@ -264,6 +338,7 @@ export default async function PortfolioPage() {
                   <th className="text-left font-medium px-4 py-3">Plan status</th>
                   <th className="text-left font-medium px-4 py-3">5-year review</th>
                   <th className="text-left font-medium px-4 py-3">Annual briefing</th>
+                  <th className="text-left font-medium px-4 py-3">Next inspection</th>
                   <th className="text-left font-medium px-4 py-3">Assets</th>
                   <th className="text-left font-medium px-4 py-3">Open actions</th>
                   <th className="w-24" />
@@ -275,12 +350,10 @@ export default async function PortfolioPage() {
                   const planVersion = f.plan?.currentVersion;
                   const nextReview = f.profile?.nextFiveYearReviewDate;
                   const hasBriefing = briefingByFacility.get(f.id);
-                  const facilityOverdueInsp = overdueInspections.filter(
-                    (s) => s.facilityId === f.id
-                  ).length;
                   const facilityOverdueActions = overdueActions.filter(
                     (a) => a.facilityId === f.id
                   ).length;
+                  const nextInsp = nextInspectionByFacility.get(f.id);
 
                   return (
                     <tr
@@ -313,6 +386,18 @@ export default async function PortfolioPage() {
                           <span className="text-emerald-700">Yes</span>
                         ) : (
                           <span className="text-amber-700">Due</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {nextInsp ? (
+                          <span>
+                            {new Date(nextInsp.dueDate).toLocaleDateString()}
+                            <span className="block text-xs text-[var(--muted)] truncate max-w-[10rem]">
+                              {nextInsp.template?.name ?? "Inspection"}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-[var(--muted)]">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3">{f._count.assets}</td>

@@ -14,22 +14,27 @@ import { Send, Square, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AssistantMarkdown } from "./AssistantMarkdown";
 import { AssistantDiagram } from "./AssistantDiagramCatalog";
+import { AssistantKnowledgeSources } from "./AssistantKnowledgeSources";
 
-/** When the model calls renderComplianceDiagram then writes text, parts are often [diagram, text]; show text first. */
+type AssistantMessagePart = NonNullable<UIMessage["parts"]>[number];
+
+function isVisualToolPart(part: AssistantMessagePart): boolean {
+  if (!isToolUIPart(part)) return false;
+  const n = getToolName(part);
+  return n === "renderComplianceDiagram" || n === "searchComplianceKnowledge";
+}
+
+/** When the model runs tools then writes text, UI parts are often [tool, text]; show text first for readability. */
 function orderedAssistantParts(parts: UIMessage["parts"] | undefined) {
   if (!parts?.length) return parts ?? [];
   const firstText = parts.findIndex(isTextUIPart);
-  const firstDiagram = parts.findIndex(
-    (p) => isToolUIPart(p) && getToolName(p) === "renderComplianceDiagram"
-  );
-  if (firstText === -1 || firstDiagram === -1 || firstDiagram >= firstText) {
+  const firstVisualTool = parts.findIndex((p) => isVisualToolPart(p));
+  if (firstText === -1 || firstVisualTool === -1 || firstVisualTool >= firstText) {
     return parts;
   }
   const texts = parts.filter(isTextUIPart);
-  const diagrams = parts.filter(
-    (p) => isToolUIPart(p) && getToolName(p) === "renderComplianceDiagram"
-  );
-  return [...texts, ...diagrams];
+  const visualTools = parts.filter((p) => isVisualToolPart(p));
+  return [...texts, ...visualTools];
 }
 
 export function ComplianceAssistant({
@@ -131,6 +136,43 @@ export function ComplianceAssistant({
                 }
                 if (isToolUIPart(part)) {
                   const name = getToolName(part);
+                  if (name === "searchComplianceKnowledge") {
+                    if (part.state === "output-available") {
+                      const out = part.output as {
+                        sources?: { title: string; file: string; relevance: number }[];
+                      };
+                      if (out?.sources?.length) {
+                        return (
+                          <AssistantKnowledgeSources
+                            key={part.toolCallId ?? i}
+                            sources={out.sources}
+                          />
+                        );
+                      }
+                    }
+                    if (part.state === "output-error") {
+                      return (
+                        <p key={part.toolCallId ?? i} className="text-amber-700 text-xs">
+                          Knowledge search failed.
+                        </p>
+                      );
+                    }
+                    if (
+                      part.state === "input-available" ||
+                      part.state === "input-streaming"
+                    ) {
+                      return (
+                        <div
+                          key={part.toolCallId ?? i}
+                          className="flex items-center gap-2 text-xs text-[var(--muted)] py-1"
+                        >
+                          <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                          Searching knowledge…
+                        </div>
+                      );
+                    }
+                    return null;
+                  }
                   if (name !== "renderComplianceDiagram") {
                     return null;
                   }

@@ -10,6 +10,10 @@ import {
   AlertTriangle,
   ClipboardCheck,
   GraduationCap,
+  Activity,
+  CalendarClock,
+  ListTodo,
+  ScrollText,
 } from "lucide-react";
 import type { ValidationOutput } from "@/lib/validation";
 
@@ -26,7 +30,18 @@ type FacilityWithRelations = {
   accountablePerson: { name: string } | null;
   applicability: { spccApplicable: boolean }[];
   qualification: { tier: string; qualifiedFacility: boolean }[];
+  plan: {
+    currentVersion: { versionNumber: number; status: string } | null;
+  } | null;
   _count: { assets: number; containmentUnits: number; files: number };
+};
+
+type AuditRow = {
+  id: string;
+  action: string;
+  objectType: string;
+  createdAt: Date;
+  actor: { name: string | null; email: string | null } | null;
 };
 
 type ScheduledInspectionWithRelations = {
@@ -50,7 +65,13 @@ type Props = {
   overdueActions: CorrectiveActionWithAsset[];
   upcomingInspections: ScheduledInspectionWithRelations[];
   trainingSummary: { hasRecentBriefing: boolean; latestDate?: Date | null };
+  openCorrectiveActionCount: number;
+  recentActivity: AuditRow[];
 };
+
+function formatAuditLabel(action: string) {
+  return action.replace(/\./g, " · ").replace(/_/g, " ");
+}
 
 export function FacilityDashboard({
   facility,
@@ -59,6 +80,8 @@ export function FacilityDashboard({
   overdueActions,
   upcomingInspections,
   trainingSummary,
+  openCorrectiveActionCount,
+  recentActivity,
 }: Props) {
   const q = facility.qualification[0];
   const a = facility.applicability[0];
@@ -82,6 +105,133 @@ export function FacilityDashboard({
           Compliance overview and quick actions
         </p>
       </div>
+
+      {/* At-a-glance health strip */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="border-[var(--border)] shadow-sm">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-start gap-3">
+              <CalendarClock className="h-5 w-5 text-[var(--steel-blue)] shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-[var(--muted)]">Next inspection</p>
+                {upcomingInspections[0] ? (
+                  <>
+                    <p className="text-sm font-medium mt-0.5 truncate">
+                      {upcomingInspections[0].template?.name ?? "Scheduled"}
+                    </p>
+                    <p className="text-xs text-[var(--muted)]">
+                      Due {new Date(upcomingInspections[0].dueDate).toLocaleDateString()}
+                    </p>
+                    <Button variant="link" size="sm" className="h-auto p-0 mt-1 text-xs" asChild>
+                      <Link
+                        href={`/app/facilities/${facility.id}/inspections/schedule/${upcomingInspections[0].id}/run`}
+                      >
+                        Open run sheet
+                      </Link>
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-sm text-[var(--muted)] mt-0.5">None scheduled</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-[var(--border)] shadow-sm">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-start gap-3">
+              <ListTodo className="h-5 w-5 text-[var(--steel-blue)] shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-medium text-[var(--muted)]">Open corrective actions</p>
+                <p className="text-2xl font-semibold tabular-nums mt-0.5">{openCorrectiveActionCount}</p>
+                <Button variant="link" size="sm" className="h-auto p-0 mt-1 text-xs" asChild>
+                  <Link href={`/app/facilities/${facility.id}/corrective-actions`}>View list</Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-[var(--border)] shadow-sm">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-start gap-3">
+              <ScrollText className="h-5 w-5 text-[var(--steel-blue)] shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-[var(--muted)]">SPCC plan</p>
+                {facility.plan?.currentVersion ? (
+                  <>
+                    <p className="text-sm font-medium mt-0.5">
+                      v{facility.plan.currentVersion.versionNumber} ·{" "}
+                      {String(facility.plan.currentVersion.status).replace(/_/g, " ")}
+                    </p>
+                    <Button variant="link" size="sm" className="h-auto p-0 mt-1 text-xs" asChild>
+                      <Link href={`/app/facilities/${facility.id}/plan`}>Open plan</Link>
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-sm text-[var(--muted)] mt-0.5">No current version</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-[var(--border)] shadow-sm">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-start gap-3">
+              <GraduationCap className="h-5 w-5 text-[var(--steel-blue)] shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-medium text-[var(--muted)]">Annual briefing</p>
+                <p
+                  className={`text-sm font-medium mt-0.5 ${
+                    trainingSummary.hasRecentBriefing ? "text-emerald-700" : "text-amber-700"
+                  }`}
+                >
+                  {trainingSummary.hasRecentBriefing ? "Current (≤365d)" : "Needs attention"}
+                </p>
+                <Button variant="link" size="sm" className="h-auto p-0 mt-1 text-xs" asChild>
+                  <Link href={`/app/facilities/${facility.id}/training`}>Training log</Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent activity (audit trail) */}
+      {recentActivity.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2 font-serif">
+              <Activity className="h-4 w-4" />
+              Recent activity
+            </CardTitle>
+            <p className="text-sm text-[var(--muted)]">
+              Changes recorded in ContainPoint for this facility
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-[var(--border)] text-sm">
+              {recentActivity.map((row) => (
+                <li key={row.id} className="py-2.5 flex flex-wrap gap-x-3 gap-y-1">
+                  <span className="text-[var(--muted)] text-xs shrink-0 w-28">
+                    {new Date(row.createdAt).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  <span className="font-medium text-[var(--foreground)] min-w-0">
+                    {formatAuditLabel(row.action)}
+                  </span>
+                  <span className="text-[var(--muted)] text-xs">
+                    {row.actor?.name ?? row.actor?.email ?? "System"} · {row.objectType}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Compliance status row */}
       <div className="grid gap-4 md:grid-cols-4">

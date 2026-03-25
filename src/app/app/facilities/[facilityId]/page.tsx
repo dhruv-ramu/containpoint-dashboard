@@ -18,6 +18,7 @@ async function getFacility(facilityId: string, userId: string) {
       accountablePerson: true,
       applicability: { orderBy: { assessedAt: "desc" }, take: 1 },
       qualification: { orderBy: { assessedAt: "desc" }, take: 1 },
+      plan: { include: { currentVersion: true } },
       _count: { select: { assets: true, containmentUnits: true, files: true } },
     },
   });
@@ -35,8 +36,15 @@ export default async function FacilityPage({
   const facility = await getFacility(facilityId, session.user.id);
   if (!facility) notFound();
 
-  const [validation, overdueInspections, overdueActions, upcomingInspections, trainingSummary] =
-    await Promise.all([
+  const [
+    validation,
+    overdueInspections,
+    overdueActions,
+    upcomingInspections,
+    trainingSummary,
+    openCorrectiveActionCount,
+    recentActivity,
+  ] = await Promise.all([
       computeValidation(facilityId),
       prisma.scheduledInspection.findMany({
         where: {
@@ -80,6 +88,18 @@ export default async function FacilityPage({
             new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
         return { hasRecentBriefing: !!hasRecentBriefing, latestDate: latest?.eventDate };
       }),
+      prisma.correctiveAction.count({
+        where: {
+          facilityId,
+          status: { notIn: ["CLOSED", "ACCEPTED_RISK"] },
+        },
+      }),
+      prisma.auditEvent.findMany({
+        where: { facilityId },
+        orderBy: { createdAt: "desc" },
+        take: 15,
+        include: { actor: { select: { name: true, email: true } } },
+      }),
     ]);
 
   return (
@@ -90,6 +110,8 @@ export default async function FacilityPage({
       overdueActions={overdueActions}
       upcomingInspections={upcomingInspections}
       trainingSummary={trainingSummary}
+      openCorrectiveActionCount={openCorrectiveActionCount}
+      recentActivity={recentActivity}
     />
   );
 }

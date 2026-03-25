@@ -33,6 +33,8 @@ export default async function SetupPage({
   const facility = await getFacility(facilityId, session.user.id);
   if (!facility) notFound();
 
+  const assetCount = await prisma.asset.count({ where: { facilityId } });
+
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <div>
@@ -51,6 +53,7 @@ export default async function SetupPage({
         initialApplicability={facility.applicability[0]}
         initialQualification={facility.qualification[0]}
         userId={session.user.id}
+        completionHints={{ assetCount }}
       />
     </div>
   );

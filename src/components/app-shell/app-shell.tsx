@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 import { AssistantFab } from "@/components/assistant/AssistantFab";
+import { GlobalAppStrip } from "./global-app-strip";
 
 type Facility = { id: string; name: string };
 
@@ -37,9 +38,14 @@ export function AppShell({
           currentFacilityId={currentFacilityId}
         />
         <main className="flex-1 overflow-auto bg-[var(--bone)] p-6">
+          <GlobalAppStrip />
           {children}
         </main>
-        <AssistantFab facilityId={currentFacilityId} facilities={facilities} />
+        <AssistantFab
+          key={currentFacilityId ?? "portfolio"}
+          facilityId={currentFacilityId}
+          facilities={facilities}
+        />
       </div>
     </div>
   );

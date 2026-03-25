@@ -14,6 +14,7 @@ import { getChatModelId, getOpenAIProvider } from "@/lib/openai-provider";
 import { formatRagContext, searchComplianceKnowledge } from "@/lib/compliance-rag";
 import { buildFacilitySnapshotJson } from "@/lib/assistant-facility-snapshot";
 import { COMPLIANCE_DIAGRAM_IDS } from "@/lib/assistant-diagram-spec";
+import { logServerStructured } from "@/lib/server-log";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
@@ -48,6 +49,7 @@ export async function POST(
   { params }: { params: Promise<{ facilityId: string }> }
 ) {
   if (!process.env.OPENAI_API_KEY) {
+    logServerStructured("assistant.missing_openai_key", { route: "chat" });
     return NextResponse.json(
       { error: "Assistant is not configured (missing OPENAI_API_KEY)." },
       { status: 503 }

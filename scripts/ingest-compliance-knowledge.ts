@@ -92,16 +92,49 @@ function chunkMarkdown(source: string, raw: string): { title: string; content: s
   return chunks;
 }
 
+/** Merge Word paragraphs into chunks ≤ MAX_CHARS (prefer paragraph boundaries over blind splits). */
 function chunkPlainSource(source: string, raw: string): { title: string; content: string }[] {
   const normalized = raw.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
   if (normalized.length < 40) return [];
+  const paras = normalized
+    .split(/\n\s*\n+/)
+    .map((p) => p.replace(/\n+/g, " ").trim())
+    .filter((p) => p.length > 0);
   const chunks: { title: string; content: string }[] = [];
-  for (let i = 0; i < normalized.length; i += MAX_CHARS) {
-    chunks.push({
-      title: `${source} (part ${chunks.length + 1})`,
-      content: normalized.slice(i, i + MAX_CHARS),
-    });
+  let buf = "";
+  let section = 0;
+
+  function flush(text: string) {
+    const t = text.trim();
+    if (t.length < 40) return;
+    if (t.length <= MAX_CHARS) {
+      section += 1;
+      chunks.push({ title: `${source} (section ${section})`, content: t });
+      return;
+    }
+    for (let i = 0; i < t.length; i += MAX_CHARS) {
+      section += 1;
+      chunks.push({
+        title: `${source} (section ${section})`,
+        content: t.slice(i, i + MAX_CHARS),
+      });
+    }
   }
+
+  for (const p of paras) {
+    const next = buf ? `${buf}\n\n${p}` : p;
+    if (next.length > MAX_CHARS && buf.length > 0) {
+      flush(buf);
+      buf = p;
+    } else {
+      buf = next;
+    }
+    if (buf.length > MAX_CHARS) {
+      flush(buf);
+      buf = "";
+    }
+  }
+  flush(buf);
   return chunks;
 }
 
