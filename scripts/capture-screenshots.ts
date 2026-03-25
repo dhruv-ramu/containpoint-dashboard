@@ -128,6 +128,48 @@ async function main() {
       await page.goto(`${BASE_URL}/app/facilities/${facilityId}/inspections`, { waitUntil: "networkidle" });
       await page.waitForTimeout(800);
       await capture("11-inspections", page);
+
+      // 13. Setup wizard
+      console.log("\n13. Capturing setup...");
+      await page.goto(`${BASE_URL}/app/facilities/${facilityId}/setup`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(800);
+      await capture("12-setup", page);
+
+      // 14. Applicability
+      console.log("\n14. Capturing applicability...");
+      await page.goto(`${BASE_URL}/app/facilities/${facilityId}/applicability`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(800);
+      await capture("13-applicability", page);
+
+      // 15. Containment registry
+      console.log("\n15. Capturing containment...");
+      await page.goto(`${BASE_URL}/app/facilities/${facilityId}/containment`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(800);
+      await capture("14-containment", page);
+
+      // 16. Corrective actions
+      console.log("\n16. Capturing corrective actions...");
+      await page.goto(`${BASE_URL}/app/facilities/${facilityId}/corrective-actions`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(800);
+      await capture("15-corrective-actions", page);
+
+      // 17. Training
+      console.log("\n17. Capturing training...");
+      await page.goto(`${BASE_URL}/app/facilities/${facilityId}/training`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(800);
+      await capture("16-training", page);
+
+      // 18. Compliance assistant (UI shell; chat may require OPENAI_API_KEY at runtime)
+      console.log("\n18. Capturing assistant...");
+      await page.goto(`${BASE_URL}/app/facilities/${facilityId}/assistant`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(800);
+      await capture("17-assistant", page);
+
+      // 19. Obligations calendar
+      console.log("\n19. Capturing obligations...");
+      await page.goto(`${BASE_URL}/app/facilities/${facilityId}/obligations`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(800);
+      await capture("18-obligations", page);
     }
 
     // 10. Portfolio
@@ -135,6 +177,12 @@ async function main() {
     await page.goto(`${BASE_URL}/app/portfolio`, { waitUntil: "networkidle" });
     await page.waitForTimeout(800);
     await capture("09-portfolio", page);
+
+    // 21. Org settings (after portfolio — still uses same session)
+    console.log("\n21. Capturing settings...");
+    await page.goto(`${BASE_URL}/app/settings`, { waitUntil: "networkidle" });
+    await page.waitForTimeout(800);
+    await capture("20-settings", page);
   } catch (err) {
     console.error("\nError:", err);
     process.exit(1);

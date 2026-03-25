@@ -8,10 +8,11 @@
 
 - [Overview](#overview)
 - [Getting Started](#getting-started)
-- [Dashboard Guide](#dashboard-guide)
+- [Dashboard Guide](#dashboard-guide) — login through org settings & screenshots
 - [Feature Reference](#feature-reference)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
+- [Capturing Screenshots](#capturing-screenshots)
 
 ---
 
@@ -28,7 +29,9 @@ ContainPoint is designed for facilities subject to the EPA's Spill Prevention, C
 - **5-year review & amendments** — Formal review workflow with amendment tracking
 - **Export center** — Generate Plan summaries, inspection reports, corrective action registers, training logs, incident logs, and full audit packs
 - **Consultant portfolio** — Multi-facility oversight for consultants and org admins
-- **Compliance assistant** — OpenAI chat with RAG over curated SPCC/product docs plus live facility data (tools)
+- **Compliance assistant** — OpenAI chat with RAG over curated SPCC/product docs plus live facility context
+- **Obligations calendar** — Regulatory inspection and review milestones in one facility timeline
+- **Internal admin bridge** — Optional signed link from the separate **ContainPoint Admin** app lets staff open the dashboard as a tenant user for support (shared `ADMIN_DASHBOARD_BRIDGE_SECRET`).
 
 ---
 
@@ -70,6 +73,7 @@ Copy `.env.example` to `.env` and set:
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (for file storage) |
 | `OPENAI_API_KEY` | OpenAI API key for the facility **Assistant** (chat + embeddings) |
 | `OPENAI_CHAT_MODEL` | Optional chat model id (default `gpt-4o-mini`) |
+| `ADMIN_DASHBOARD_BRIDGE_SECRET` | Same 32+ character secret as the internal admin app (enables support “open in dashboard” links); optional if you do not use the admin console |
 
 **Compliance assistant:** After `npx prisma migrate dev`, run `npm run ingest:knowledge` (requires `OPENAI_API_KEY` and `DATABASE_URL`) to embed markdown under `data/compliance-knowledge/` into `ComplianceKnowledgeChunk`. Add or edit those `.md` files, then re-run ingest to refresh RAG.
 
@@ -266,6 +270,70 @@ Completed inspections can trigger corrective actions. Inspection history support
 
 ---
 
+### 12. Setup wizard
+
+![Setup wizard](docs/screenshots/12-setup.png)
+
+The **Setup** flow guides new facilities through applicability, qualification, profile, accountable person, and initial registries, with progress tracked against live server state.
+
+---
+
+### 13. Applicability
+
+![Applicability](docs/screenshots/13-applicability.png)
+
+Record **SPCC applicability** determinations (capacity thresholds, discharge expectations, exclusions) with assessment history for the facility.
+
+---
+
+### 14. Containment registry
+
+![Containment](docs/screenshots/14-containment.png)
+
+Manage **secondary containment** units, link assets to containment, and document basis of design data used in plans and exports.
+
+---
+
+### 15. Corrective actions
+
+![Corrective actions](docs/screenshots/15-corrective-actions.png)
+
+Track **corrective actions** from failed inspections through assignment, comments, evidence, and closure—surfaced on the facility dashboard and portfolio when overdue.
+
+---
+
+### 16. Training
+
+![Training](docs/screenshots/16-training.png)
+
+**Training events**, attendance, and signatures support annual briefing and PE/operator training recordkeeping.
+
+---
+
+### 17. Compliance assistant
+
+![Assistant](docs/screenshots/17-assistant.png)
+
+The **Assistant** provides facility-scoped chat (RAG over ingested compliance knowledge plus tools). Requires `OPENAI_API_KEY` and a successful `npm run ingest:knowledge` for grounded answers.
+
+---
+
+### 18. Obligations calendar
+
+![Obligations](docs/screenshots/18-obligations.png)
+
+The **Obligations** view aggregates inspection, review, and related due dates for quick scanning of upcoming regulatory work.
+
+---
+
+### 19. Organization settings
+
+![Settings](docs/screenshots/20-settings.png)
+
+**Settings** covers organization-level preferences and membership context for the signed-in user.
+
+---
+
 ## Feature Reference
 
 ### Navigation
@@ -273,7 +341,7 @@ Completed inspections can trigger corrective actions. Inspection history support
 | Context    | Sidebar items                                                                 |
 |------------|-------------------------------------------------------------------------------|
 | Global     | Dashboard, Facilities, Portfolio, Settings                                    |
-| Facility   | Dashboard, Setup, Profile, Applicability, Assets, Containment, Plan, Inspections, Corrective Actions, Training, Incidents, Exports, Obligations |
+| Facility   | Dashboard, Setup, Profile, Applicability, Assets, Containment, Plan, Inspections, Corrective Actions, Training, Incidents, Exports, Assistant, Obligations |
 
 ### Key Workflows
 
@@ -306,6 +374,8 @@ Status is shown on the facility dashboard and in the portfolio.
 | Validation | Zod                               |
 | Forms      | React Hook Form                   |
 | UI         | Radix UI, Lucide icons            |
+| Assistant  | OpenAI (`ai` SDK), optional Supabase for file storage |
+| PDF / export | `@react-pdf/renderer` (and related export pipelines) |
 
 ---
 
@@ -342,11 +412,12 @@ src/
 
 To regenerate the documentation screenshots:
 
-1. **Start the app** — `npm run dev`
-2. **Ensure DB is seeded** — `npm run db:seed`
-3. **Run the capture script** — `npm run screenshots`
+1. **Start the app** — `npm run dev` (PostgreSQL must be reachable; `DATABASE_URL` set)
+2. **Ensure DB is seeded** — `npm run db:seed` (uses `seed@containpoint.com` / `Seed1234!` in the script)
+3. **Run the capture script** — `npm run screenshots`  
+   Optional: `SCREENSHOT_BASE_URL=https://staging.example.com npx tsx scripts/capture-screenshots.ts`
 
-Screenshots are saved to `docs/screenshots/`. The script uses Playwright to log in and capture each main screen.
+Outputs land in `docs/screenshots/` (`01-login` … `11-inspections`, facility workflows `12-setup` … `18-obligations`, `09-portfolio`, `20-settings`). The Assistant screen captures UI even when `OPENAI_API_KEY` is unset.
 
 ---
 
